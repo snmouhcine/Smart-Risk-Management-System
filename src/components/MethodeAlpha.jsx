@@ -6,6 +6,9 @@ import {
   Cpu, Bot, LineChart, Flame, Skull
 } from 'lucide-react';
 
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { callAIAPI } from '../utils/aiProviders';
+
 // Import des modules
 import Dashboard from './modules/Dashboard';
 import Journal from './modules/Journal';
@@ -45,7 +48,12 @@ const MethodeAlpha = () => {
   const [drawdownProtection, setDrawdownProtection] = useState(null);
   const [monthlyPeak, setMonthlyPeak] = useState(0);
   const [emergencyMode, setEmergencyMode] = useState(false);
-  const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [anthropicApiKey, setAnthropicApiKey] = useLocalStorage('anthropicApiKey', '');
+  
+  // NOUVEAU : États pour multi-modèles IA
+  const [aiProvider, setAiProvider] = useLocalStorage('aiProvider', 'anthropic');
+  const [openaiApiKey, setOpenaiApiKey] = useLocalStorage('openaiApiKey', '');
+  const [selectedModel, setSelectedModel] = useLocalStorage('selectedModel', 'claude-3-5-sonnet-20241022');
   
   // NOUVEAU : État pour les recommandations IA qui seront utilisées par le calculateur
   const [aiRecommendedRisk, setAiRecommendedRisk] = useState(null);
@@ -263,20 +271,16 @@ const MethodeAlpha = () => {
         protectionLevel: drawdown?.protectionLevel || 'safe'
       };
 
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(anthropicApiKey && { "x-api-key": anthropicApiKey }),
-          ...(anthropicApiKey && { "anthropic-version": "2023-06-01" })
-        },
-        body: JSON.stringify({
-          model: "claude-3-sonnet-20240229",
-          max_tokens: 2000,
-          messages: [
-            { 
-              role: "user", 
-              content: `Tu es un DIRECTEUR FINANCIER expert des marchés. Analyse ces données et fournis des KPIs DECISIONNELS pour un trader professionnel.
+      // Vérifier quelle clé API utiliser
+      const apiKey = aiProvider === 'anthropic' ? anthropicApiKey : openaiApiKey;
+      
+      if (!apiKey) {
+        throw new Error(`Clé API ${aiProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'} non configurée`);
+      }
+
+      const messages = [{
+        role: "user",
+        content: `Tu es un DIRECTEUR FINANCIER expert des marchés. Analyse ces données et fournis des KPIs DECISIONNELS pour un trader professionnel.
 
 DONNÉES FINANCIÈRES:
 ${JSON.stringify(financialData, null, 2)}
@@ -326,17 +330,19 @@ Réponds UNIQUEMENT avec un JSON valide dans ce format exact:
 }
 
 IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur financier de trading floor.`
-            }
-          ]
-        })
-      });
+      }];
 
-      if (!response.ok) {
-        throw new Error(`Erreur API: ${response.status}`);
+      const response = await callAIAPI(aiProvider, apiKey, selectedModel, messages, 2000);
+      
+      let responseText;
+      if (aiProvider === 'anthropic') {
+        responseText = response.content[0].text;
+      } else {
+        // Pour OpenAI, la réponse est déjà normalisée par callAIAPI
+        responseText = response.content[0].text;
       }
-
-      const data = await response.json();
-      let responseText = data.content[0].text;
+      
+      // Nettoyer la réponse pour extraire le JSON
       responseText = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       
       const analysis = JSON.parse(responseText);
@@ -872,6 +878,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               isAnalyzing={isAnalyzing}
               performFinancialDirectorAnalysis={performFinancialDirectorAnalysis}
               anthropicApiKey={anthropicApiKey}
+              aiProvider={aiProvider}
+              selectedModel={selectedModel}
+              openaiApiKey={openaiApiKey}
             />
           )}
 
@@ -894,6 +903,12 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               secureMode={secureMode}
               setSecureMode={setSecureMode}
               calculateCurrentBalanceFromJournal={calculateCurrentBalanceFromJournal}
+              aiProvider={aiProvider}
+              setAiProvider={setAiProvider}
+              openaiApiKey={openaiApiKey}
+              setOpenaiApiKey={setOpenaiApiKey}
+              selectedModel={selectedModel}
+              setSelectedModel={setSelectedModel}
             />
           )}
         </div>

@@ -1,258 +1,143 @@
-// Multi-AI Provider System
-// Supports multiple AI models with easy switching
-
-export const AI_PROVIDERS = {
-  ANTHROPIC: {
-    id: 'anthropic',
-    name: 'Anthropic (Claude)',
-    models: [
-      { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet', maxTokens: 8192 },
-      { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', maxTokens: 8192 },
-      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', maxTokens: 4096 },
-      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', maxTokens: 4096 },
-      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', maxTokens: 4096 }
-    ],
-    defaultModel: 'claude-3-5-sonnet-20241022',
-    apiKeyPrefix: 'sk-ant-',
-    endpoint: '/api/anthropic/v1/messages',
-    headers: (apiKey) => ({
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true'
-    }),
-    formatRequest: (messages, model, maxTokens = 2000) => ({
-      model: model,
-      max_tokens: maxTokens,
-      messages: messages
-    }),
-    parseResponse: (data) => {
-      return data.content[0].text;
-    }
-  },
-  
-  OPENAI: {
-    id: 'openai',
-    name: 'OpenAI (ChatGPT)',
-    models: [
-      { id: 'gpt-4o', name: 'GPT-4o (Omni)', maxTokens: 128000 },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', maxTokens: 128000 },
-      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', maxTokens: 128000 },
-      { id: 'gpt-4-turbo-2024-04-09', name: 'GPT-4 Turbo (April 2024)', maxTokens: 128000 },
-      { id: 'gpt-4', name: 'GPT-4', maxTokens: 8192 },
-      { id: 'gpt-4-0613', name: 'GPT-4 (June 2023)', maxTokens: 8192 },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', maxTokens: 16385 },
-      { id: 'gpt-3.5-turbo-0125', name: 'GPT-3.5 Turbo (Latest)', maxTokens: 16385 },
-      { id: 'gpt-3.5-turbo-1106', name: 'GPT-3.5 Turbo (Nov 2023)', maxTokens: 16385 }
-    ],
-    defaultModel: 'gpt-3.5-turbo',
-    apiKeyPrefix: 'sk-',
-    endpoint: '/api/openai/v1/chat/completions',
-    headers: (apiKey) => ({
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`
-    }),
-    formatRequest: (messages, model, maxTokens = 2000) => ({
-      model: model,
-      messages: messages,
-      max_tokens: maxTokens,
-      temperature: 0.7
-    }),
-    parseResponse: (data) => {
-      return data.choices[0].message.content;
-    }
-  },
-  
-  GOOGLE: {
-    id: 'google',
-    name: 'Google (Gemini)',
-    models: [
-      { id: 'gemini-pro', name: 'Gemini Pro', maxTokens: 32768 },
-      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision', maxTokens: 32768 }
-    ],
-    defaultModel: 'gemini-pro',
-    apiKeyPrefix: 'AI',
-    endpoint: '/api/google/v1beta/models',
-    headers: (apiKey) => ({
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
-    }),
-    formatRequest: (messages, model, maxTokens = 2000) => ({
-      contents: messages.map(msg => ({
-        role: msg.role === 'assistant' ? 'model' : 'user',
-        parts: [{ text: msg.content }]
-      })),
-      generationConfig: {
-        maxOutputTokens: maxTokens,
-        temperature: 0.7
-      }
-    }),
-    parseResponse: (data) => {
-      return data.candidates[0].content.parts[0].text;
-    }
-  }
+// Configuration des modèles disponibles
+export const AI_MODELS = {
+  anthropic: [
+    { id: 'claude-3-5-sonnet-20241022', name: 'Claude 3.5 Sonnet (Latest)', description: 'Modèle le plus avancé et rapide' },
+    { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', description: 'Modèle le plus puissant pour tâches complexes' },
+    { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', description: 'Équilibre entre performance et coût' },
+    { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', description: 'Modèle rapide et économique' }
+  ],
+  openai: [
+    { id: 'gpt-4-turbo-preview', name: 'GPT-4 Turbo', description: 'Dernière version de GPT-4' },
+    { id: 'gpt-4', name: 'GPT-4', description: 'Modèle GPT-4 standard' },
+    { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', description: 'Rapide et économique' }
+  ]
 };
 
-// AI Provider Manager Class
-export class AIProviderManager {
-  constructor() {
-    this.currentProvider = null;
-    this.apiKeys = {};
-  }
-
-  // Set API key for a provider
-  setApiKey(providerId, apiKey) {
-    this.apiKeys[providerId] = apiKey;
-  }
-
-  // Get API key for a provider
-  getApiKey(providerId) {
-    return this.apiKeys[providerId];
-  }
-
-  // Set current provider
-  setCurrentProvider(providerId) {
-    if (AI_PROVIDERS[providerId]) {
-      this.currentProvider = AI_PROVIDERS[providerId];
-      return true;
-    }
-    return false;
-  }
-
-  // Get current provider
-  getCurrentProvider() {
-    return this.currentProvider;
-  }
-
-  // Validate API key format
-  validateApiKey(providerId, apiKey) {
-    const provider = AI_PROVIDERS[providerId];
-    if (!provider || !apiKey) return false;
-    
-    // Basic validation - check if key starts with expected prefix
-    if (provider.apiKeyPrefix && !apiKey.startsWith(provider.apiKeyPrefix)) {
-      return false;
-    }
-    
-    return true;
-  }
-
-  // Make API request to current provider
-  async makeRequest(messages, options = {}) {
-    if (!this.currentProvider) {
-      throw new Error('No AI provider selected');
-    }
-
-    const apiKey = this.getApiKey(this.currentProvider.id);
-    if (!apiKey) {
-      throw new Error(`No API key configured for ${this.currentProvider.name}`);
-    }
-
-    const model = options.model || this.currentProvider.defaultModel;
-    const maxTokens = options.maxTokens || 2000;
-    
-    console.log('AI Provider Request:', {
-      provider: this.currentProvider.name,
-      model: model,
-      endpoint: this.currentProvider.endpoint
+// Fonction pour appeler l'API Anthropic
+export async function callAnthropicAPI(apiKey, model, messages, maxTokens = 2000) {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true" // Active CORS
+      },
+      body: JSON.stringify({
+        model: model,
+        max_tokens: maxTokens,
+        messages: messages
+      })
     });
 
-    try {
-      const response = await fetch(this.currentProvider.endpoint, {
-        method: 'POST',
-        headers: this.currentProvider.headers(apiKey),
-        body: JSON.stringify(
-          this.currentProvider.formatRequest(messages, model, maxTokens)
-        )
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API Error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      return this.currentProvider.parseResponse(data);
-    } catch (error) {
-      console.error(`Error with ${this.currentProvider.name}:`, error);
-      throw error;
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Erreur Anthropic API (${response.status}): ${error}`);
     }
+
+    return await response.json();
+  } catch (error) {
+    console.error("Erreur lors de l'appel Anthropic:", error);
+    throw error;
+  }
+}
+
+// Fonction pour appeler l'API OpenAI
+export async function callOpenAIAPI(apiKey, model, messages, maxTokens = 2000) {
+  try {
+    // Log pour debug
+    console.log("Appel OpenAI avec modèle:", model);
+    console.log("Clé API commence par:", apiKey.substring(0, 7) + "...");
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        max_tokens: maxTokens,
+        temperature: 0.7
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { error: { message: errorText } };
+      }
+      
+      // Gestion spécifique de l'erreur 429 insufficient_quota
+      if (response.status === 429 && errorData.error?.code === 'insufficient_quota') {
+        throw new Error(`Quota insuffisant OpenAI. Vérifiez:
+1. Votre solde de crédits sur https://platform.openai.com/billing
+2. Que vous avez bien ajouté des crédits (pas seulement un abonnement ChatGPT)
+3. Essayez de générer une nouvelle clé API
+4. Attendez quelques heures si vous venez d'ajouter des crédits
+5. Utilisez Anthropic (Claude) en attendant`);
+      }
+      
+      throw new Error(`Erreur OpenAI API (${response.status}): ${errorData.error?.message || errorText}`);
+    }
+
+    const data = await response.json();
+    
+    // Convertir la réponse OpenAI au format Anthropic pour uniformité
+    return {
+      content: [{
+        text: data.choices[0].message.content
+      }]
+    };
+  } catch (error) {
+    console.error("Erreur lors de l'appel OpenAI:", error);
+    throw error;
+  }
+}
+
+// Fonction unifiée pour appeler l'API appropriée
+export async function callAIAPI(provider, apiKey, model, messages, maxTokens = 2000) {
+  if (!apiKey) {
+    throw new Error(`Clé API ${provider} non configurée`);
   }
 
-  // Get all available providers
-  getAvailableProviders() {
-    return Object.values(AI_PROVIDERS).map(provider => ({
-      id: provider.id,
-      name: provider.name,
-      models: provider.models,
-      hasApiKey: !!this.getApiKey(provider.id)
+  // Convertir les messages au format approprié si nécessaire
+  let formattedMessages = messages;
+  
+  if (provider === 'openai') {
+    // OpenAI utilise un format légèrement différent
+    formattedMessages = messages.map(msg => ({
+      role: msg.role === 'assistant' ? 'assistant' : msg.role,
+      content: typeof msg.content === 'string' ? msg.content : msg.content[0].text
     }));
-  }
-
-  // Get models for a provider
-  getModelsForProvider(providerId) {
-    const provider = AI_PROVIDERS[providerId];
-    return provider ? provider.models : [];
+    return callOpenAIAPI(apiKey, model, formattedMessages, maxTokens);
+  } else {
+    return callAnthropicAPI(apiKey, model, messages, maxTokens);
   }
 }
 
-// Create singleton instance
-export const aiProviderManager = new AIProviderManager();
-
-// Helper function to format the financial director prompt
-export const formatFinancialDirectorPrompt = (financialData) => {
-  return [{
-    role: "user",
-    content: `Tu es un DIRECTEUR DE RISQUE expert en trading. Ta priorité ABSOLUE est la PRÉSERVATION DU CAPITAL et éviter les pertes. Analyse ces données et fournis des décisions IMMÉDIATES.
-
-## SITUATION ACTUELLE:
-${JSON.stringify(financialData, null, 2)}
-
-## RÈGLES CRITIQUES:
-1. Si targetAchieved = true → RÉDUIRE LE RISQUE AU MINIMUM (max 0.5%)
-2. Si consecutiveLosses >= 2 → RÉDUIRE LE RISQUE DE 50%
-3. Si drawdown > 5% → MODE DÉFENSIF IMMÉDIAT
-4. Si monthlyReturn > 80% de l'objectif → PROTÉGER LES GAINS
-5. TOUJOURS privilégier la protection du capital sur les gains potentiels
-
-## Format de réponse OBLIGATOIRE (JSON):
-{
-  "executiveSummary": {
-    "status": "SAFE/CAUTION/DANGER/CRITICAL",
-    "headline": "Décision principale en 1 phrase",
-    "priority": "Action IMMÉDIATE à prendre"
-  },
-  "kpis": {
-    "maxLossToday": "$XXX",
-    "optimalRiskPerTrade": "$XXX",
-    "minDailyGainRequired": "$XXX",
-    "drawdownStatus": "OK/WARNING/DANGER/EMERGENCY",
-    "tradesLeftBudget": X,
-    "daysToTarget": X,
-    "winRateRequired": "XX%",
-    "capitalAtRisk": "X%"
-  },
-  "aiRecommendations": [
-    "Action 1: PRÉCISE et ACTIONNABLE",
-    "Action 2: PRÉCISE et ACTIONNABLE",
-    "Action 3: PRÉCISE et ACTIONNABLE"
-  ],
-  "riskAssessment": {
-    "level": "LOW/MEDIUM/HIGH/EXTREME",
-    "factors": ["Facteur risque principal", "Facteur risque secondaire"],
-    "recommendation": "Décision claire: TRADER ou ATTENDRE"
-  },
-  "marketStrategy": {
-    "approach": "AGGRESSIVE/BALANCED/DEFENSIVE/STOP",
-    "reasoning": "Justification en 1 phrase",
-    "specificActions": ["FAIRE ceci maintenant", "NE PAS faire cela"]
+// Fonction pour tester la connexion à l'API
+export async function testAPIConnection(provider, apiKey) {
+  try {
+    const testMessage = [{
+      role: "user",
+      content: provider === 'anthropic' 
+        ? "Réponds simplement 'Connexion réussie' si tu reçois ce message."
+        : "Reply with 'Connection successful' if you receive this message."
+    }];
+    
+    const defaultModel = provider === 'anthropic' 
+      ? 'claude-3-haiku-20240307' 
+      : 'gpt-3.5-turbo';
+    
+    const response = await callAIAPI(provider, apiKey, defaultModel, testMessage, 50);
+    return { success: true, message: "Connexion réussie!" };
+  } catch (error) {
+    return { success: false, message: error.message };
   }
 }
-
-IMPORTANT:
-- Si l'objectif mensuel est atteint → Recommande FORTEMENT de réduire/arrêter le trading
-- Si pertes consécutives → Recommande une PAUSE
-- Calcule optimalRiskPerTrade en fonction de adjustedRiskPercent, PAS originalRiskPercent
-- Sois CONSERVATEUR - mieux vaut manquer une opportunité que perdre du capital`
-  }];
-};

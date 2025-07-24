@@ -8,7 +8,10 @@ const DirecteurIA = ({
   aiAnalysis,
   isAnalyzing,
   performFinancialDirectorAnalysis,
-  anthropicApiKey
+  anthropicApiKey,
+  aiProvider,
+  selectedModel,
+  openaiApiKey
 }) => {
   return (
     <div className="space-y-6">
@@ -26,7 +29,7 @@ const DirecteurIA = ({
           </div>
           <button 
             onClick={performFinancialDirectorAnalysis}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || (!anthropicApiKey && !openaiApiKey)}
             className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg transition-all flex items-center space-x-2 disabled:opacity-50"
           >
             {isAnalyzing ? (
@@ -48,6 +51,11 @@ const DirecteurIA = ({
           <p className="text-sm text-blue-200">
             💡 Les recommandations du Directeur IA seront automatiquement appliquées dans le Calculateur de Position
           </p>
+          {(anthropicApiKey || openaiApiKey) && (
+            <p className="text-xs text-blue-300 mt-1">
+              🤖 Modèle actif: {aiProvider === 'anthropic' ? 'Claude' : 'GPT'} ({selectedModel})
+            </p>
+          )}
         </div>
 
         {/* Status Exécutif */}
