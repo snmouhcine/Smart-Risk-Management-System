@@ -1074,6 +1074,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               aiProvider={aiProvider}
               selectedModel={selectedModel}
               openaiApiKey={openaiApiKey}
+              recommendations={recommendations}
+              stats={getJournalStats()}
+              capital={parseFloat(capital) || parseFloat(currentBalance) || 0}
             />
           )}
 

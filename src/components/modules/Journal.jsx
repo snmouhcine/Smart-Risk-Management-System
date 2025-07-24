@@ -213,8 +213,21 @@ const Journal = ({
                     <div className="font-bold">{day}</div>
                     {dayData && dayData.hasTraded && (
                       <div className="text-xs mt-1">
-                        {parseFloat(dayData.pnl) > 0 ? '+' : ''}
-                        {parseFloat(dayData.pnl) ? formatCurrency(parseFloat(dayData.pnl)) : '$0'}
+                        {(() => {
+                          const trades = dayData.pnl ? dayData.pnl.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t)) : [];
+                          const total = trades.reduce((sum, t) => sum + t, 0);
+                          return (
+                            <>
+                              {total > 0 ? '+' : ''}
+                              {formatCurrency(total)}
+                              {trades.length > 1 && (
+                                <div className="text-[10px] opacity-80">
+                                  ({trades.length} trades)
+                                </div>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
                     {dayData && !dayData.hasTraded && (
@@ -311,19 +324,43 @@ const Journal = ({
               </div>
 
               {dayData.hasTraded && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    P&L du jour ($)
-                  </label>
-                  <input
-                    type="text"
-                    value={dayData.pnl}
-                    onChange={(e) => setDayData(prev => ({ ...prev, pnl: parseNumberInput(e.target.value, 2) }))}
-                    placeholder="Ex: 150.50 ou -75.25"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  <div className="text-xs text-slate-500 mt-1">
-                    L'IA analysera ce trade pour détecter des patterns
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">
+                      P&L par trade ($)
+                    </label>
+                    <div className="text-xs text-slate-500 mb-2">
+                      Entrez chaque trade séparé par une virgule (ex: 150, -75, 200)
+                    </div>
+                    <input
+                      type="text"
+                      value={dayData.pnl}
+                      onChange={(e) => setDayData(prev => ({ ...prev, pnl: e.target.value }))}
+                      placeholder="Ex: 150, -75.50, 200"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {dayData.pnl && (
+                      <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+                        <div className="text-sm">
+                          {(() => {
+                            const trades = dayData.pnl.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t));
+                            const total = trades.reduce((sum, t) => sum + t, 0);
+                            return (
+                              <>
+                                <div className="font-medium text-slate-700">
+                                  {trades.length} trade{trades.length > 1 ? 's' : ''} • Total: {formatCurrency(total)}
+                                </div>
+                                {trades.length > 0 && (
+                                  <div className="text-xs text-slate-600 mt-1">
+                                    Détail: {trades.map(t => formatCurrency(t)).join(' | ')}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
