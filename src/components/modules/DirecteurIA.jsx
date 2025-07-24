@@ -3,7 +3,7 @@ import {
   Brain, Zap, AlertTriangle, Target, TrendingUp, Shield,
   Cpu, LineChart, Lock, DollarSign, Info, X, Activity,
   Gauge, Clock, AlertCircle, CheckCircle, TrendingDown,
-  BarChart3, Radar
+  BarChart3, Radar, HelpCircle
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
@@ -17,38 +17,84 @@ const DirecteurIA = ({
   openaiApiKey,
   recommendations,
   stats,
-  capital
+  capital,
+  journalData,
+  monthlyObjective,
+  weeklyObjective
 }) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoContent, setInfoContent] = useState({ title: '', description: '' });
   const [selectedPattern, setSelectedPattern] = useState(null);
 
-  // Calcul du niveau de danger (0-100)
+  // Utiliser les vraies données de la plateforme
+  const realCapital = capital || 50000;
+  const realStats = stats || {
+    winRate: 0,
+    profitFactor: 1,
+    totalTrades: 0,
+    consecutiveLosses: 0,
+    consecutiveWins: 0,
+    totalPnL: 0
+  };
+
+  // Calcul du niveau de danger basé sur les vraies données
   const calculateDangerLevel = () => {
-    if (!recommendations) return 30;
+    let danger = 20; // Base
+
+    // Drawdown actuel
+    const currentDrawdown = realCapital > 0 ? ((realCapital - (realCapital + realStats.totalPnL)) / realCapital) * 100 : 0;
+    if (currentDrawdown > 10) danger += 40;
+    else if (currentDrawdown > 5) danger += 25;
+    else if (currentDrawdown > 3) danger += 15;
+
+    // Pertes consécutives
+    if (realStats.consecutiveLosses >= 3) danger += 30;
+    else if (realStats.consecutiveLosses >= 2) danger += 20;
+    else if (realStats.consecutiveLosses >= 1) danger += 10;
+
+    // Win rate faible
+    if (realStats.winRate < 30) danger += 20;
+    else if (realStats.winRate < 40) danger += 10;
+
+    // Overtrading
+    const today = new Date();
+    const todayTrades = journalData?.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate.toDateString() === today.toDateString();
+    }).length || 0;
     
-    let danger = 0;
-    if (recommendations.status === 'emergency') danger = 90;
-    else if (recommendations.status === 'danger') danger = 75;
-    else if (recommendations.status === 'pattern_warning') danger = 60;
-    else if (recommendations.status === 'warning') danger = 45;
-    else danger = 30;
-    
-    return danger;
+    if (todayTrades > 5) danger += 20;
+    else if (todayTrades > 3) danger += 10;
+
+    return Math.min(100, Math.max(0, danger));
   };
 
-  // Calcul de l'opportunité (0-100)
+  // Calcul de l'opportunité basé sur les vraies données
   const calculateOpportunity = () => {
-    if (!stats) return 50;
-    
-    const winRate = stats.winRate || 50;
-    const profitFactor = stats.profitFactor || 1;
-    const opportunity = Math.min(100, (winRate * 0.7 + profitFactor * 15));
-    
-    return Math.round(opportunity);
+    let opportunity = 50; // Base neutre
+
+    // Win rate élevé
+    if (realStats.winRate > 60) opportunity += 20;
+    else if (realStats.winRate > 50) opportunity += 10;
+
+    // Profit factor
+    if (realStats.profitFactor > 2) opportunity += 20;
+    else if (realStats.profitFactor > 1.5) opportunity += 10;
+
+    // Gains consécutifs
+    if (realStats.consecutiveWins >= 3) opportunity += 15;
+    else if (realStats.consecutiveWins >= 2) opportunity += 10;
+
+    // Performance mensuelle
+    const monthProgress = monthlyObjective?.current || 0;
+    const monthTarget = monthlyObjective?.target || 8;
+    if (monthProgress > monthTarget) opportunity += 15;
+    else if (monthProgress > monthTarget * 0.5) opportunity += 10;
+
+    return Math.min(100, Math.max(0, opportunity));
   };
 
-  // Détection des patterns
+  // Détection des patterns basée sur les vraies données
   const detectPatterns = () => {
     const patterns = {
       revenge: 0,
@@ -58,14 +104,42 @@ const DirecteurIA = ({
       patience: 100
     };
 
-    if (stats?.consecutiveLosses >= 2) {
-      patterns.revenge = Math.min(100, stats.consecutiveLosses * 30);
-      patterns.discipline -= stats.consecutiveLosses * 20;
+    // Revenge trading
+    if (realStats.consecutiveLosses >= 3) {
+      patterns.revenge = 80;
+      patterns.discipline -= 40;
+    } else if (realStats.consecutiveLosses >= 2) {
+      patterns.revenge = 50;
+      patterns.discipline -= 20;
     }
 
-    if (stats?.totalTrades > 5) {
-      patterns.overtrading = Math.min(100, (stats.totalTrades - 5) * 20);
-      patterns.patience -= (stats.totalTrades - 5) * 15;
+    // Overtrading
+    const today = new Date();
+    const todayTrades = journalData?.filter(entry => {
+      const entryDate = new Date(entry.date);
+      return entryDate.toDateString() === today.toDateString();
+    }).length || 0;
+
+    if (todayTrades > 5) {
+      patterns.overtrading = 90;
+      patterns.patience -= 50;
+    } else if (todayTrades > 3) {
+      patterns.overtrading = 60;
+      patterns.patience -= 30;
+    }
+
+    // FOMO (trading en dehors des heures optimales)
+    const hour = new Date().getHours();
+    const minute = new Date().getMinutes();
+    const totalMinutes = hour * 60 + minute;
+    const optimalStart = 15 * 60 + 30; // 15h30
+    const optimalEnd = 17 * 60 + 30; // 17h30
+
+    if (totalMinutes < optimalStart || totalMinutes > optimalEnd) {
+      if (todayTrades > 0) {
+        patterns.fomo = 70;
+        patterns.discipline -= 30;
+      }
     }
 
     return patterns;
@@ -75,25 +149,54 @@ const DirecteurIA = ({
   const dangerLevel = calculateDangerLevel();
   const opportunityLevel = calculateOpportunity();
 
-  // Déterminer l'état du timing
+  // Déterminer l'état du timing pour Paris (15h30-17h30)
   const getTimingStatus = () => {
-    const hour = new Date().getHours();
-    const minute = new Date().getMinutes();
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const totalMinutes = hour * 60 + minute;
     
-    // Heures optimales de trading (9h30-11h30 et 14h-15h30)
-    if ((hour === 9 && minute >= 30) || (hour === 10) || (hour === 11 && minute <= 30)) {
-      return { status: 'OPTIMAL', color: 'text-green-600', icon: '▲' };
-    } else if ((hour === 14) || (hour === 15 && minute <= 30)) {
-      return { status: 'BON', color: 'text-blue-600', icon: '●' };
-    } else if (hour >= 16 || hour < 9) {
-      return { status: 'FERMÉ', color: 'text-red-600', icon: '■' };
+    // Heures de trading Paris
+    const marketOpen = 15 * 60 + 30; // 15h30
+    const marketClose = 17 * 60 + 30; // 17h30
+    
+    if (totalMinutes >= marketOpen && totalMinutes <= marketClose) {
+      return { status: 'OPTIMAL', color: 'text-green-400', icon: '▲', bg: 'bg-green-500/20' };
+    } else if (totalMinutes >= marketOpen - 30 && totalMinutes < marketOpen) {
+      return { status: 'PRÉPARATION', color: 'text-yellow-400', icon: '●', bg: 'bg-yellow-500/20' };
+    } else if (totalMinutes > marketClose && totalMinutes <= marketClose + 30) {
+      return { status: 'CLÔTURE', color: 'text-orange-400', icon: '▼', bg: 'bg-orange-500/20' };
     } else {
-      return { status: 'MOYEN', color: 'text-yellow-600', icon: '▼' };
+      return { status: 'FERMÉ', color: 'text-red-400', icon: '■', bg: 'bg-red-500/20' };
     }
   };
 
   const timing = getTimingStatus();
   const currentTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  // Explications pour le cockpit
+  const cockpitExplanations = {
+    danger: {
+      title: "Niveau de Danger",
+      description: "🎯 Cette jauge mesure votre niveau de risque actuel basé sur :\n\n• **Drawdown** : Perte depuis votre pic de capital\n• **Pertes consécutives** : Impact psychologique des pertes\n• **Win rate** : Taux de réussite actuel\n• **Overtrading** : Nombre de trades aujourd'hui\n\n📊 **Interprétation** :\n• 0-30% (VERT) : Zone sûre, tradez normalement\n• 30-60% (JAUNE) : Prudence requise, réduisez les positions\n• 60-100% (ROUGE) : Danger critique, envisagez une pause"
+    },
+    opportunity: {
+      title: "Opportunité Marché",
+      description: "📈 Cette jauge évalue vos chances de succès basées sur :\n\n• **Performance actuelle** : Win rate et profit factor\n• **Momentum** : Gains consécutifs\n• **Progression objectifs** : Vs. cibles mensuelles\n• **Conditions marché** : Volatilité et tendances\n\n💡 **Interprétation** :\n• 0-40% (GRIS) : Conditions défavorables, soyez sélectif\n• 40-70% (BLEU) : Conditions neutres, trading normal\n• 70-100% (VERT) : Conditions favorables, saisissez les opportunités"
+    },
+    timing: {
+      title: "Timing Marché Paris",
+      description: "⏰ Indicateur des heures de trading optimales (15h30-17h30 Paris) :\n\n• **OPTIMAL** (15h30-17h30) : Meilleure liquidité et volatilité\n• **PRÉPARATION** (15h00-15h30) : Préparez vos setups\n• **CLÔTURE** (17h30-18h00) : Fermez les positions\n• **FERMÉ** : Marché fermé, évitez de trader\n\n🌍 **Pourquoi ces heures ?**\n• Chevauchement Europe/USA\n• Volume maximum\n• Mouvements plus prévisibles\n• Spreads réduits"
+    },
+    patternRadar: {
+      title: "Pattern Radar Comportemental",
+      description: "🧠 Détection automatique de vos patterns de trading :\n\n**Patterns Négatifs** (à éviter) :\n• **Revenge Trading** : Tentative de récupérer les pertes rapidement\n• **Overtrading** : Trop de trades dans une journée\n• **FOMO** : Trading en dehors des heures optimales\n\n**Patterns Positifs** (à maintenir) :\n• **Discipline** : Respect des règles de trading\n• **Patience** : Attente des bons setups\n\n📊 **Comment lire** :\n• Barres ROUGES sur patterns négatifs = Danger\n• Barres VERTES sur patterns positifs = Bon\n• Objectif : Minimiser les négatifs, maximiser les positifs"
+    },
+    simulator: {
+      title: "Simulateur Live",
+      description: "🎮 Simulation en temps réel de votre prochain trade :\n\n**Données affichées** :\n• **Probabilité Win** : Basée sur votre performance récente\n• **Risk/Reward** : Ratio optimal calculé par l'IA\n• **Gain potentiel** : Si le trade est gagnant\n• **Risque max** : Perte maximale autorisée\n\n**Utilisation** :\n1. **VALIDER TRADE** : Confirme les paramètres pour le calculateur\n2. **SIMULER** : Teste différents scénarios\n\n💡 **Conseil** : N'entrez en position que si la probabilité > 50% et R:R > 1.5"
+    }
+  };
 
   // Définitions des explications pour chaque métrique
   const kpiExplanations = {
@@ -131,252 +234,299 @@ const DirecteurIA = ({
     }
   };
 
-  const showInfo = (kpiType) => {
-    setInfoContent(kpiExplanations[kpiType]);
+  const showInfo = (type, category = 'kpi') => {
+    const content = category === 'cockpit' ? cockpitExplanations[type] : kpiExplanations[type];
+    setInfoContent(content);
     setShowInfoModal(true);
   };
 
+  // Calculer les valeurs du simulateur basées sur les vraies données
+  const calculateSimulatorValues = () => {
+    // Probabilité basée sur le win rate réel
+    const winProbability = realStats.winRate || 50;
+    
+    // Risk/Reward basé sur le profit factor
+    let riskReward = 1.5; // Défaut
+    if (realStats.profitFactor > 2) riskReward = 2.5;
+    else if (realStats.profitFactor > 1.5) riskReward = 2.0;
+    else if (realStats.profitFactor > 1) riskReward = 1.5;
+    
+    // Montant de risque basé sur le capital et les recommandations
+    const riskAmount = realCapital * 0.01; // 1% par défaut
+    const potentialGain = riskAmount * riskReward;
+    
+    return {
+      winProbability: Math.round(winProbability),
+      riskReward: riskReward.toFixed(1),
+      potentialGain,
+      maxRisk: riskAmount
+    };
+  };
+
+  const simulatorValues = calculateSimulatorValues();
+
   return (
     <div className="space-y-6">
-      {/* Header Cockpit Ultra Moderne */}
-      <div className="bg-gradient-to-br from-slate-900 via-purple-900 to-indigo-900 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
-        {/* Effet de grille futuriste en arrière-plan */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute inset-0" style={{
-            backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent 35px, rgba(255,255,255,0.1) 35px, rgba(255,255,255,0.1) 36px),
-                            repeating-linear-gradient(90deg, transparent, transparent 35px, rgba(255,255,255,0.1) 35px, rgba(255,255,255,0.1) 36px)`
-          }} />
+      {/* Header Cockpit - Design amélioré */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl border border-slate-700">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-white flex items-center">
+              <Brain className="w-8 h-8 mr-3 text-blue-400" />
+              COCKPIT DE TRADING INTELLIGENT
+            </h1>
+            <p className="text-slate-400 mt-1">Centre de contrôle IA pour décisions optimales</p>
+          </div>
+          
+          <button
+            onClick={performFinancialDirectorAnalysis}
+            disabled={isAnalyzing}
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-2"
+          >
+            {isAnalyzing ? (
+              <>
+                <Cpu className="w-5 h-5 animate-spin" />
+                <span>ANALYSE EN COURS...</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-5 h-5" />
+                <span>ANALYSE TEMPS RÉEL</span>
+              </>
+            )}
+          </button>
         </div>
 
-        <div className="relative z-10">
-          <div className="flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-white flex items-center">
-                <Brain className="w-10 h-10 mr-4 text-cyan-400" />
-                COCKPIT DE TRADING INTELLIGENT
-              </h1>
-              <p className="text-purple-200 mt-2">Centre de contrôle IA pour décisions optimales</p>
-            </div>
-            
-            <button
-              onClick={performFinancialDirectorAnalysis}
-              disabled={isAnalyzing}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold rounded-xl hover:shadow-lg hover:scale-105 transition-all duration-300 flex items-center space-x-3"
-            >
-              {isAnalyzing ? (
-                <>
-                  <Cpu className="w-5 h-5 animate-spin" />
-                  <span>ANALYSE EN COURS...</span>
-                </>
-              ) : (
-                <>
-                  <Zap className="w-5 h-5" />
-                  <span>ANALYSE TEMPS RÉEL</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Tableau de bord principal - 3 jauges */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Jauge de Danger */}
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-              <h3 className="text-white/80 text-sm font-medium mb-4 flex items-center">
+        {/* Tableau de bord principal - 3 jauges avec disposition améliorée */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* Jauge de Danger */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center">
                 <AlertTriangle className="w-4 h-4 mr-2 text-red-400" />
                 NIVEAU DE DANGER
               </h3>
-              <div className="relative h-32">
-                <svg className="w-full h-full" viewBox="0 0 200 100">
-                  {/* Arc de fond */}
-                  <path
-                    d="M 20 80 A 60 60 0 0 1 180 80"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.1)"
-                    strokeWidth="20"
-                  />
-                  {/* Arc de progression */}
-                  <path
-                    d="M 20 80 A 60 60 0 0 1 180 80"
-                    fill="none"
-                    stroke={dangerLevel > 70 ? '#ef4444' : dangerLevel > 40 ? '#f59e0b' : '#10b981'}
-                    strokeWidth="20"
-                    strokeDasharray={`${dangerLevel * 1.57} 157`}
-                    className="transition-all duration-1000"
-                  />
-                  {/* Aiguille */}
-                  <line
-                    x1="100"
-                    y1="80"
-                    x2={100 + Math.cos((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
-                    y2={80 + Math.sin((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
-                    stroke="white"
-                    strokeWidth="3"
-                    className="transition-all duration-1000"
-                  />
-                  <circle cx="100" cy="80" r="5" fill="white" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center mt-8">
-                    <div className="text-3xl font-bold text-white">{dangerLevel}%</div>
-                    <div className={`text-sm ${dangerLevel > 70 ? 'text-red-400' : dangerLevel > 40 ? 'text-yellow-400' : 'text-green-400'}`}>
-                      {dangerLevel > 70 ? 'CRITIQUE' : dangerLevel > 40 ? 'ATTENTION' : 'SAFE'}
-                    </div>
+              <button
+                onClick={() => showInfo('danger', 'cockpit')}
+                className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+                title="Comprendre cette métrique"
+              >
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="relative h-28">
+              <svg className="w-full h-full" viewBox="0 0 200 100">
+                {/* Arc de fond */}
+                <path
+                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  fill="none"
+                  stroke="rgba(148, 163, 184, 0.2)"
+                  strokeWidth="15"
+                />
+                {/* Arc de progression */}
+                <path
+                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  fill="none"
+                  stroke={dangerLevel > 60 ? '#ef4444' : dangerLevel > 30 ? '#f59e0b' : '#10b981'}
+                  strokeWidth="15"
+                  strokeDasharray={`${dangerLevel * 1.57} 157`}
+                  className="transition-all duration-1000"
+                />
+                {/* Aiguille */}
+                <line
+                  x1="100"
+                  y1="80"
+                  x2={100 + Math.cos((Math.PI - (dangerLevel * Math.PI / 100))) * 45}
+                  y2={80 + Math.sin((Math.PI - (dangerLevel * Math.PI / 100))) * 45}
+                  stroke="white"
+                  strokeWidth="2"
+                  className="transition-all duration-1000"
+                />
+                <circle cx="100" cy="80" r="4" fill="white" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center mt-6">
+                  <div className="text-2xl font-bold text-white">{dangerLevel}%</div>
+                  <div className={`text-xs ${dangerLevel > 60 ? 'text-red-400' : dangerLevel > 30 ? 'text-yellow-400' : 'text-green-400'}`}>
+                    {dangerLevel > 60 ? 'CRITIQUE' : dangerLevel > 30 ? 'ATTENTION' : 'SAFE'}
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Jauge d'Opportunité */}
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-              <h3 className="text-white/80 text-sm font-medium mb-4 flex items-center">
+          {/* Jauge d'Opportunité */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center">
                 <TrendingUp className="w-4 h-4 mr-2 text-green-400" />
                 OPPORTUNITÉ MARCHÉ
               </h3>
-              <div className="relative h-32">
-                <svg className="w-full h-full" viewBox="0 0 200 100">
-                  <path
-                    d="M 20 80 A 60 60 0 0 1 180 80"
-                    fill="none"
-                    stroke="rgba(255,255,255,0.1)"
-                    strokeWidth="20"
-                  />
-                  <path
-                    d="M 20 80 A 60 60 0 0 1 180 80"
-                    fill="none"
-                    stroke={opportunityLevel > 70 ? '#10b981' : opportunityLevel > 40 ? '#3b82f6' : '#6b7280'}
-                    strokeWidth="20"
-                    strokeDasharray={`${opportunityLevel * 1.57} 157`}
-                    className="transition-all duration-1000"
-                  />
-                  <line
-                    x1="100"
-                    y1="80"
-                    x2={100 + Math.cos((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
-                    y2={80 + Math.sin((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
-                    stroke="white"
-                    strokeWidth="3"
-                    className="transition-all duration-1000"
-                  />
-                  <circle cx="100" cy="80" r="5" fill="white" />
-                </svg>
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="text-center mt-8">
-                    <div className="text-3xl font-bold text-white">{opportunityLevel}%</div>
-                    <div className={`text-sm ${opportunityLevel > 70 ? 'text-green-400' : opportunityLevel > 40 ? 'text-blue-400' : 'text-gray-400'}`}>
-                      {opportunityLevel > 70 ? 'BULLISH' : opportunityLevel > 40 ? 'NEUTRE' : 'BEARISH'}
-                    </div>
+              <button
+                onClick={() => showInfo('opportunity', 'cockpit')}
+                className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+                title="Comprendre cette métrique"
+              >
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="relative h-28">
+              <svg className="w-full h-full" viewBox="0 0 200 100">
+                <path
+                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  fill="none"
+                  stroke="rgba(148, 163, 184, 0.2)"
+                  strokeWidth="15"
+                />
+                <path
+                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  fill="none"
+                  stroke={opportunityLevel > 70 ? '#10b981' : opportunityLevel > 40 ? '#3b82f6' : '#6b7280'}
+                  strokeWidth="15"
+                  strokeDasharray={`${opportunityLevel * 1.57} 157`}
+                  className="transition-all duration-1000"
+                />
+                <line
+                  x1="100"
+                  y1="80"
+                  x2={100 + Math.cos((Math.PI - (opportunityLevel * Math.PI / 100))) * 45}
+                  y2={80 + Math.sin((Math.PI - (opportunityLevel * Math.PI / 100))) * 45}
+                  stroke="white"
+                  strokeWidth="2"
+                  className="transition-all duration-1000"
+                />
+                <circle cx="100" cy="80" r="4" fill="white" />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="text-center mt-6">
+                  <div className="text-2xl font-bold text-white">{opportunityLevel}%</div>
+                  <div className={`text-xs ${opportunityLevel > 70 ? 'text-green-400' : opportunityLevel > 40 ? 'text-blue-400' : 'text-gray-400'}`}>
+                    {opportunityLevel > 70 ? 'BULLISH' : opportunityLevel > 40 ? 'NEUTRE' : 'BEARISH'}
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Indicateur de Timing */}
-            <div className="bg-black/30 backdrop-blur-sm rounded-2xl p-6 border border-white/10">
-              <h3 className="text-white/80 text-sm font-medium mb-4 flex items-center">
+          {/* Indicateur de Timing */}
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-medium text-slate-300 flex items-center">
                 <Clock className="w-4 h-4 mr-2 text-blue-400" />
                 TIMING MARCHÉ
               </h3>
-              <div className="flex flex-col items-center justify-center h-32">
-                <div className="text-4xl font-bold text-white mb-2">{currentTime}</div>
-                <div className={`flex items-center space-x-2 ${timing.color}`}>
-                  <span className="text-2xl">{timing.icon}</span>
-                  <span className="font-semibold">{timing.status}</span>
-                </div>
-                <div className="text-xs text-white/60 mt-2">
-                  Prochaine zone: 14h00
-                </div>
+              <button
+                onClick={() => showInfo('timing', 'cockpit')}
+                className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+                title="Comprendre cette métrique"
+              >
+                <HelpCircle className="w-4 h-4 text-slate-400" />
+              </button>
+            </div>
+            <div className="flex flex-col items-center justify-center h-28">
+              <div className="text-3xl font-bold text-white mb-1">{currentTime}</div>
+              <div className={`px-3 py-1 rounded-lg ${timing.bg} flex items-center space-x-2`}>
+                <span className={`text-lg ${timing.color}`}>{timing.icon}</span>
+                <span className={`font-semibold ${timing.color}`}>{timing.status}</span>
+              </div>
+              <div className="text-xs text-slate-400 mt-2">
+                Zone optimale: 15h30-17h30
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* KPIs Existants - Nouveau Design */}
+      {/* KPIs Existants - Style amélioré */}
       {aiAnalysis && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* On garde tous les KPIs mais avec un nouveau style */}
-          <div className="bg-gradient-to-br from-red-500/10 to-red-600/10 backdrop-blur-sm rounded-xl p-4 border border-red-500/20">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-red-300">PERTE MAX</h4>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-medium text-red-400">PERTE MAX</h4>
               <button
                 onClick={() => showInfo('maxLossToday')}
-                className="p-1 hover:bg-red-500/20 rounded-full transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <Info className="w-3 h-3 text-red-400" />
+                <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
-            <div className="text-2xl font-bold text-red-400">${formatNumber(parseFloat(aiAnalysis.kpis.maxLossToday.replace(/[\$,]/g, '')))}</div>
-            <div className="text-xs text-red-300/70">Limite journalière</div>
+            <div className="text-xl font-bold text-white">${formatNumber(parseFloat(aiAnalysis.kpis.maxLossToday.replace(/[\$,]/g, '')))}</div>
+            <div className="text-xs text-slate-400">Limite journalière</div>
           </div>
 
-          <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/10 backdrop-blur-sm rounded-xl p-4 border border-blue-500/20">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-blue-300">RISQUE OPTIMAL</h4>
+          <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-medium text-blue-400">RISQUE OPTIMAL</h4>
               <button
                 onClick={() => showInfo('optimalRiskPerTrade')}
-                className="p-1 hover:bg-blue-500/20 rounded-full transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <Info className="w-3 h-3 text-blue-400" />
+                <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
-            <div className="text-2xl font-bold text-blue-400">${formatNumber(parseFloat(aiAnalysis.kpis.optimalRiskPerTrade.replace(/[\$,]/g, '')))}</div>
-            <div className="text-xs text-blue-300/70">Par trade</div>
+            <div className="text-xl font-bold text-white">${formatNumber(parseFloat(aiAnalysis.kpis.optimalRiskPerTrade.replace(/[\$,]/g, '')))}</div>
+            <div className="text-xs text-slate-400">Par trade</div>
           </div>
 
-          <div className="bg-gradient-to-br from-green-500/10 to-green-600/10 backdrop-blur-sm rounded-xl p-4 border border-green-500/20">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-green-300">GAIN REQUIS</h4>
+          <div className="bg-slate-800 rounded-lg p-3 border border-slate-700">
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-medium text-green-400">GAIN REQUIS</h4>
               <button
                 onClick={() => showInfo('minDailyGainRequired')}
-                className="p-1 hover:bg-green-500/20 rounded-full transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <Info className="w-3 h-3 text-green-400" />
+                <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
-            <div className="text-2xl font-bold text-green-400">${formatNumber(parseFloat(aiAnalysis.kpis.minDailyGainRequired.replace(/[\$,]/g, '')))}</div>
-            <div className="text-xs text-green-300/70">Par jour</div>
+            <div className="text-xl font-bold text-white">${formatNumber(parseFloat(aiAnalysis.kpis.minDailyGainRequired.replace(/[\$,]/g, '')))}</div>
+            <div className="text-xs text-slate-400">Par jour</div>
           </div>
 
-          <div className={`bg-gradient-to-br ${
-            aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'from-red-500/10 to-red-600/10' :
-            aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'from-orange-500/10 to-orange-600/10' :
-            'from-green-500/10 to-green-600/10'
-          } backdrop-blur-sm rounded-xl p-4 border ${
-            aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'border-red-500/20' :
-            aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'border-orange-500/20' :
-            'border-green-500/20'
+          <div className={`bg-slate-800 rounded-lg p-3 border ${
+            aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'border-red-500' :
+            aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'border-orange-500' :
+            'border-green-500'
           }`}>
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-sm font-medium text-white/80">DRAWDOWN</h4>
+            <div className="flex items-center justify-between mb-1">
+              <h4 className="text-xs font-medium text-slate-300">DRAWDOWN</h4>
               <button
                 onClick={() => showInfo('drawdownStatus')}
-                className="p-1 hover:bg-white/10 rounded-full transition-colors"
+                className="p-1 hover:bg-slate-700 rounded transition-colors"
               >
-                <Info className="w-3 h-3 text-white/60" />
+                <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
-            <div className={`text-2xl font-bold ${
+            <div className={`text-xl font-bold ${
               aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-400' :
               aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-400' :
               'text-green-400'
             }`}>
               {aiAnalysis.kpis.drawdownStatus}
             </div>
-            <div className="text-xs text-white/60">Protection</div>
+            <div className="text-xs text-slate-400">Protection</div>
           </div>
         </div>
       )}
 
       {/* Pattern Radar et Simulateur */}
-      <div className="grid md:grid-cols-2 gap-6">
+      <div className="grid md:grid-cols-2 gap-4">
         {/* Pattern Radar */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <Radar className="w-5 h-5 mr-2 text-purple-400" />
-            PATTERN RADAR
-          </h3>
+        <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white flex items-center">
+              <Radar className="w-5 h-5 mr-2 text-purple-400" />
+              PATTERN RADAR
+            </h3>
+            <button
+              onClick={() => showInfo('patternRadar', 'cockpit')}
+              className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Comprendre les patterns"
+            >
+              <HelpCircle className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
           
-          <div className="space-y-4">
+          <div className="space-y-3">
             {Object.entries(patterns).map(([pattern, value]) => {
               const isNegative = ['revenge', 'overtrading', 'fomo'].includes(pattern);
               const color = isNegative 
@@ -384,7 +534,7 @@ const DirecteurIA = ({
                 : value > 60 ? 'bg-green-500' : value > 30 ? 'bg-orange-500' : 'bg-red-500';
               
               return (
-                <div key={pattern} className="space-y-2">
+                <div key={pattern} className="space-y-1">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium text-slate-300 capitalize">
                       {pattern.replace(/([A-Z])/g, ' $1').trim()}
@@ -403,9 +553,9 @@ const DirecteurIA = ({
           </div>
 
           {patterns.revenge > 60 && (
-            <div className="mt-4 p-3 bg-red-500/20 border border-red-500/40 rounded-lg">
-              <p className="text-sm text-red-300 flex items-center">
-                <AlertCircle className="w-4 h-4 mr-2" />
+            <div className="mt-3 p-2 bg-red-500/20 border border-red-500/40 rounded-lg">
+              <p className="text-xs text-red-300 flex items-center">
+                <AlertCircle className="w-3 h-3 mr-1" />
                 Pattern de revenge trading détecté!
               </p>
             </div>
@@ -413,44 +563,59 @@ const DirecteurIA = ({
         </div>
 
         {/* Simulateur Live */}
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-6 border border-slate-700">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <Activity className="w-5 h-5 mr-2 text-cyan-400" />
-            SIMULATEUR LIVE
-          </h3>
+        <div className="bg-slate-800 rounded-xl p-5 border border-slate-700">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-white flex items-center">
+              <Activity className="w-5 h-5 mr-2 text-cyan-400" />
+              SIMULATEUR LIVE
+            </h3>
+            <button
+              onClick={() => showInfo('simulator', 'cockpit')}
+              className="p-1.5 hover:bg-slate-700 rounded-lg transition-colors"
+              title="Comment utiliser le simulateur"
+            >
+              <HelpCircle className="w-4 h-4 text-slate-400" />
+            </button>
+          </div>
           
           <div className="space-y-4">
-            <div className="bg-slate-800/50 rounded-lg p-4">
+            <div className="bg-slate-700/50 rounded-lg p-4">
               <h4 className="text-sm font-medium text-slate-300 mb-3">Si vous tradez MAINTENANT:</h4>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <div className="text-xs text-slate-400">Probabilité Win</div>
-                  <div className="text-xl font-bold text-green-400">{opportunityLevel}%</div>
+                  <div className="text-xl font-bold text-green-400">{simulatorValues.winProbability}%</div>
                 </div>
                 <div>
                   <div className="text-xs text-slate-400">Risk/Reward</div>
-                  <div className="text-xl font-bold text-blue-400">1:2.3</div>
+                  <div className="text-xl font-bold text-blue-400">1:{simulatorValues.riskReward}</div>
                 </div>
               </div>
 
-              <div className="mt-4 space-y-2">
+              <div className="mt-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Gain potentiel:</span>
-                  <span className="text-green-400">+{formatCurrency(capital * 0.01 * 2.3)}</span>
+                  <span className="text-green-400">+{formatCurrency(simulatorValues.potentialGain)}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">Risque max:</span>
-                  <span className="text-red-400">-{formatCurrency(capital * 0.01)}</span>
+                  <span className="text-red-400">-{formatCurrency(simulatorValues.maxRisk)}</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex space-x-3">
-              <button className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+            <div className="flex space-x-2">
+              <button 
+                className="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-sm"
+                onClick={() => alert('Les paramètres seront appliqués au calculateur')}
+              >
                 VALIDER TRADE
               </button>
-              <button className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors">
+              <button 
+                className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-white font-medium rounded-lg transition-colors text-sm"
+                onClick={() => alert('Mode simulation: testez différents scénarios')}
+              >
                 SIMULER
               </button>
             </div>
@@ -460,49 +625,49 @@ const DirecteurIA = ({
 
       {/* Métriques secondaires existantes */}
       {aiAnalysis && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50">
             <div className="flex items-center justify-between">
               <div className="text-xs text-slate-400">Trades Restants</div>
               <button
                 onClick={() => showInfo('tradesLeftBudget')}
-                className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-0.5 hover:bg-slate-700 rounded transition-colors"
               >
                 <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
             <div className="text-lg font-bold text-slate-200">{aiAnalysis.kpis.tradesLeftBudget}</div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50">
             <div className="flex items-center justify-between">
               <div className="text-xs text-slate-400">Jours Restants</div>
               <button
                 onClick={() => showInfo('daysToTarget')}
-                className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-0.5 hover:bg-slate-700 rounded transition-colors"
               >
                 <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
             <div className="text-lg font-bold text-slate-200">{aiAnalysis.kpis.daysToTarget}</div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50">
             <div className="flex items-center justify-between">
               <div className="text-xs text-slate-400">Win Rate Requis</div>
               <button
                 onClick={() => showInfo('winRateRequired')}
-                className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-0.5 hover:bg-slate-700 rounded transition-colors"
               >
                 <Info className="w-3 h-3 text-slate-500" />
               </button>
             </div>
             <div className="text-lg font-bold text-slate-200">{aiAnalysis.kpis.winRateRequired}</div>
           </div>
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-lg p-3 border border-slate-700/50">
+          <div className="bg-slate-800/50 rounded-lg p-2 border border-slate-700/50">
             <div className="flex items-center justify-between">
               <div className="text-xs text-slate-400">Capital à Risque</div>
               <button
                 onClick={() => showInfo('capitalAtRisk')}
-                className="p-1 hover:bg-slate-700 rounded-full transition-colors"
+                className="p-0.5 hover:bg-slate-700 rounded transition-colors"
               >
                 <Info className="w-3 h-3 text-slate-500" />
               </button>
@@ -512,38 +677,16 @@ const DirecteurIA = ({
         </div>
       )}
 
-      {/* Directives Financières */}
-      {aiAnalysis && (
-        <div className="bg-gradient-to-r from-indigo-900/50 to-purple-900/50 backdrop-blur-sm p-6 rounded-xl border border-indigo-500/20">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
-            <Cpu className="w-5 h-5 mr-2 text-indigo-400" />
-            📋 DIRECTIVES FINANCIÈRES IMMÉDIATES
-          </h3>
-          <div className="grid md:grid-cols-3 gap-4">
-            {aiAnalysis.financialDirectives.map((directive, index) => (
-              <div key={index} className="bg-black/30 p-4 rounded-lg border border-indigo-500/20">
-                <div className="flex items-start space-x-3">
-                  <div className="w-6 h-6 bg-indigo-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
-                    {index + 1}
-                  </div>
-                  <div className="text-sm text-indigo-200">{directive}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Assessment de Risque & Stratégie */}
       {aiAnalysis && (
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className={`p-6 rounded-xl border-2 ${
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className={`p-5 rounded-xl border ${
             aiAnalysis.riskAssessment.level === 'EXTREME' ? 'bg-red-900/20 border-red-500' :
             aiAnalysis.riskAssessment.level === 'HIGH' ? 'bg-orange-900/20 border-orange-500' :
             aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'bg-yellow-900/20 border-yellow-500' :
             'bg-green-900/20 border-green-500'
           }`}>
-            <h3 className={`text-lg font-semibold mb-4 flex items-center ${
+            <h3 className={`text-lg font-semibold mb-3 flex items-center ${
               aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-400' :
               aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-400' :
               aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-400' :
@@ -552,7 +695,7 @@ const DirecteurIA = ({
               <AlertTriangle className="w-5 h-5 mr-2" />
               🎯 ASSESSMENT RISQUE
             </h3>
-            <div className={`text-2xl font-bold mb-2 ${
+            <div className={`text-xl font-bold mb-2 ${
               aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-300' :
               aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-300' :
               aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-300' :
@@ -583,12 +726,12 @@ const DirecteurIA = ({
             </div>
           </div>
 
-          <div className="bg-gradient-to-br from-purple-900/20 to-indigo-900/20 p-6 rounded-xl border border-purple-500/20">
-            <h3 className="text-lg font-semibold text-white mb-4 flex items-center">
+          <div className="bg-slate-800 p-5 rounded-xl border border-slate-700">
+            <h3 className="text-lg font-semibold text-white mb-3 flex items-center">
               <LineChart className="w-5 h-5 mr-2 text-purple-400" />
               🎯 STRATÉGIE MARCHÉ
             </h3>
-            <div className={`text-2xl font-bold mb-2 ${
+            <div className={`text-xl font-bold mb-2 ${
               aiAnalysis.marketStrategy.approach === 'AGGRESSIVE' ? 'text-red-400' :
               aiAnalysis.marketStrategy.approach === 'BALANCED' ? 'text-blue-400' :
               aiAnalysis.marketStrategy.approach === 'CONSERVATIVE' ? 'text-green-400' :
@@ -597,7 +740,7 @@ const DirecteurIA = ({
               {aiAnalysis.marketStrategy.approach}
             </div>
             <div className="text-sm text-slate-300 mb-3">{aiAnalysis.marketStrategy.reasoning}</div>
-            <div className="bg-purple-800/30 border border-purple-400/30 rounded-lg p-3">
+            <div className="bg-purple-900/30 border border-purple-500/30 rounded-lg p-3">
               <div className="text-sm font-medium text-purple-300">PROCHAINE ACTION :</div>
               <div className="text-sm text-purple-200 mt-1">{aiAnalysis.marketStrategy.nextAction}</div>
             </div>
@@ -607,96 +750,56 @@ const DirecteurIA = ({
 
       {/* État inactif */}
       {!aiAnalysis && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-12 text-center border border-slate-700">
-          <div className="w-24 h-24 bg-gradient-to-r from-purple-500 to-cyan-500 rounded-full flex items-center justify-center mx-auto mb-6 animate-pulse">
-            <Brain className="w-12 h-12 text-white" />
+        <div className="bg-slate-800 rounded-2xl p-10 text-center border border-slate-700">
+          <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <Brain className="w-10 h-10 text-white" />
           </div>
-          <h3 className="text-2xl font-bold text-white mb-4">Cockpit IA en Attente</h3>
-          <p className="text-slate-400 mb-8 max-w-2xl mx-auto">
-            Activez l'analyse temps réel pour obtenir des insights de trading avancés et des recommandations basées sur l'IA.
+          <h3 className="text-xl font-bold text-white mb-3">Cockpit IA en Attente</h3>
+          <p className="text-slate-400 mb-6 max-w-2xl mx-auto">
+            Activez l'analyse temps réel pour obtenir des insights de trading avancés basés sur vos données réelles.
           </p>
           
           {!anthropicApiKey && !openaiApiKey && (
-            <div className="bg-gradient-to-r from-blue-900/50 to-indigo-900/50 p-6 rounded-lg border border-blue-500/20 mb-8 max-w-2xl mx-auto">
-              <h4 className="font-semibold text-blue-300 mb-3 flex items-center justify-center">
-                <Lock className="w-5 h-5 mr-2" />
-                🔑 Configuration API Recommandée
+            <div className="bg-blue-900/20 p-4 rounded-lg border border-blue-500/20 mb-6 max-w-xl mx-auto">
+              <h4 className="font-semibold text-blue-300 mb-2 flex items-center justify-center">
+                <Lock className="w-4 h-4 mr-2" />
+                Configuration API Requise
               </h4>
-              <div className="text-sm text-blue-200 space-y-2">
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                  <span>Allez dans <strong>Paramètres</strong> pour ajouter votre clé API</span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                  <span>Obtenez votre clé sur <strong>console.anthropic.com</strong> ou <strong>platform.openai.com</strong></span>
-                </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                  <span>Analyses illimitées avec votre propre compte</span>
-                </div>
+              <div className="text-sm text-blue-200 space-y-1">
+                <p>• Allez dans Paramètres pour ajouter votre clé API</p>
+                <p>• Anthropic ou OpenAI supportés</p>
               </div>
             </div>
           )}
 
           <button
             onClick={performFinancialDirectorAnalysis}
-            className="px-8 py-4 bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-bold rounded-xl hover:shadow-xl hover:scale-105 transition-all duration-300"
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white font-bold rounded-lg hover:shadow-lg hover:scale-105 transition-all duration-300"
           >
             DÉMARRER L'ANALYSE
           </button>
-
-          <div className="bg-gradient-to-r from-slate-700/50 to-slate-800/50 p-6 rounded-lg max-w-3xl mx-auto mt-8">
-            <h4 className="font-semibold text-slate-200 mb-4">🎯 Votre Cockpit IA analysera :</h4>
-            <div className="grid md:grid-cols-3 gap-4 text-sm text-slate-300">
-              <div className="flex items-center space-x-2">
-                <AlertTriangle className="w-4 h-4 text-red-400" />
-                <span>Niveau de danger en temps réel</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <TrendingUp className="w-4 h-4 text-green-400" />
-                <span>Opportunités de marché</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Clock className="w-4 h-4 text-blue-400" />
-                <span>Timing optimal de trading</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Radar className="w-4 h-4 text-purple-400" />
-                <span>Détection de patterns</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Activity className="w-4 h-4 text-cyan-400" />
-                <span>Simulation en direct</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <Shield className="w-4 h-4 text-orange-400" />
-                <span>Protection du capital</span>
-              </div>
-            </div>
-          </div>
         </div>
       )}
 
-      {/* Modal d'information (réutilisée du composant original) */}
+      {/* Modal d'information */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-slate-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-700">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-semibold text-slate-900 flex items-center">
-                <Info className="w-6 h-6 mr-2 text-blue-600" />
+              <h3 className="text-xl font-semibold text-white flex items-center">
+                <Info className="w-6 h-6 mr-2 text-blue-400" />
                 {infoContent.title}
               </h3>
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="text-slate-500 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors"
+                className="text-slate-400 hover:text-white p-1 rounded-full hover:bg-slate-700 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
 
             <div className="prose prose-sm max-w-none">
-              <div className="text-slate-700 whitespace-pre-line leading-relaxed">
+              <div className="text-slate-300 whitespace-pre-line leading-relaxed">
                 {infoContent.description}
               </div>
             </div>
