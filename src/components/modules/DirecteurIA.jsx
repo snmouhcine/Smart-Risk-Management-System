@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Brain, Zap, AlertTriangle, Target, TrendingUp, Shield,
-  Cpu, LineChart, Lock, DollarSign
+  Cpu, LineChart, Lock, DollarSign, Info, X
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
@@ -14,6 +14,49 @@ const DirecteurIA = ({
   selectedModel,
   openaiApiKey
 }) => {
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [infoContent, setInfoContent] = useState({ title: '', description: '' });
+
+  // Définitions des explications pour chaque métrique
+  const kpiExplanations = {
+    maxLossToday: {
+      title: "Perte Max Aujourd'hui",
+      description: "💰 C'est le montant maximum que vous pouvez vous permettre de perdre aujourd'hui selon votre stratégie de gestion du risque.\n\n🎯 Calculé en fonction de :\n• Votre capital total\n• Votre limite de perte journalière (ex: 3%)\n• Votre performance récente\n\n⚠️ IMPORTANT : Si vous atteignez cette limite, vous devez ARRÊTER de trader pour la journée. C'est votre filet de sécurité pour protéger votre capital."
+    },
+    optimalRiskPerTrade: {
+      title: "Risque Optimal par Trade",
+      description: "🎯 C'est le montant recommandé à risquer sur chaque trade individuel pour maximiser vos profits tout en protégeant votre capital.\n\n📊 Calculé selon :\n• La méthode Kelly ou règle du 1-2%\n• Votre win rate actuel\n• Votre ratio risque/récompense\n• Votre niveau de drawdown\n\n💡 Si vous risquez ce montant par trade avec un bon setup, vous optimisez vos chances de succès à long terme."
+    },
+    minDailyGainRequired: {
+      title: "Gain Minimum Requis par Jour",
+      description: "📈 C'est le montant minimum que vous devez gagner chaque jour pour atteindre votre objectif mensuel.\n\n🗓️ Calculé selon :\n• Votre objectif mensuel (ex: 8%)\n• Les jours restants dans le mois\n• Votre performance actuelle du mois\n\n🎯 Si vous gagnez au moins ce montant quotidiennement, vous êtes sur la bonne voie pour réussir votre objectif mensuel."
+    },
+    drawdownStatus: {
+      title: "Statut de Drawdown",
+      description: "📊 Indique votre niveau de perte par rapport à votre pic de capital le plus récent.\n\n🚦 Les niveaux :\n• 🟢 SAFE : Drawdown < 5% - Trading normal\n• 🟡 WARNING : Drawdown 5-10% - Soyez prudent\n• 🔴 CRITICAL : Drawdown > 10% - Mode défensif strict\n\n💡 Le drawdown vous aide à identifier si vous traversez une mauvaise passe et devez ajuster votre stratégie."
+    },
+    tradesLeftBudget: {
+      title: "Trades Restants dans le Budget",
+      description: "🎲 Nombre de trades que vous pouvez encore faire aujourd'hui sans dépasser votre limite de perte journalière.\n\n🧮 Calcul :\n• Perte max journalière ÷ Risque par trade\n• Exemple : $1,500 ÷ $500 = 3 trades\n\n⚠️ Si ce chiffre est faible (ex: 1.2), vous avez déjà utilisé la majorité de votre budget risque aujourd'hui. Soyez très sélectif sur vos prochains trades."
+    },
+    daysToTarget: {
+      title: "Jours Restants pour l'Objectif",
+      description: "📅 Nombre de jours de trading restants dans le mois pour atteindre votre objectif mensuel.\n\n🗓️ Calcul automatique :\n• Jours ouvrables restants jusqu'à la fin du mois\n• Exclut weekends et jours fériés\n\n⏰ Plus ce nombre diminue, plus la pression augmente pour performer chaque jour restant."
+    },
+    winRateRequired: {
+      title: "Win Rate Requis pour l'Objectif",
+      description: "🎯 Le pourcentage de trades gagnants dont vous avez besoin pour atteindre votre objectif mensuel.\n\n📊 Basé sur :\n• Votre ratio risque/récompense moyen\n• Le montant restant à gagner\n• Le nombre de trades prévus\n\n💡 Si votre win rate actuel est inférieur à ce requis, vous devez soit améliorer votre sélection de trades, soit augmenter votre ratio R:R."
+    },
+    capitalAtRisk: {
+      title: "Capital à Risque Total",
+      description: "💼 Montant total de votre capital qui pourrait être en danger selon votre stratégie actuelle.\n\n🔍 Inclut :\n• Positions ouvertes actuelles\n• Exposition maximale possible\n• Marge utilisée\n\n⚠️ Ne devrait jamais dépasser 20-30% de votre capital total pour une gestion de risque saine."
+    }
+  };
+
+  const showInfo = (kpiType) => {
+    setInfoContent(kpiExplanations[kpiType]);
+    setShowInfoModal(true);
+  };
   return (
     <div className="space-y-6">
       {/* Header Directeur Financier */}
@@ -98,27 +141,54 @@ const DirecteurIA = ({
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-slate-600">PERTE MAX AUJOURD'HUI</h3>
-                <AlertTriangle className="w-5 h-5 text-red-500" />
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => showInfo('maxLossToday')}
+                    className="p-1 hover:bg-red-100 rounded-full transition-colors"
+                    title="Voir explication détaillée"
+                  >
+                    <Info className="w-4 h-4 text-red-500" />
+                  </button>
+                  <AlertTriangle className="w-5 h-5 text-red-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-red-600">{formatNumber(parseFloat(aiAnalysis.kpis.maxLossToday.replace(/[\$,]/g, '')))}</div>
+              <div className="text-2xl font-bold text-red-600">${formatNumber(parseFloat(aiAnalysis.kpis.maxLossToday.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Limite absolue journalière</div>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-slate-600">RISQUE OPTIMAL</h3>
-                <Target className="w-5 h-5 text-blue-500" />
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => showInfo('optimalRiskPerTrade')}
+                    className="p-1 hover:bg-blue-100 rounded-full transition-colors"
+                    title="Voir explication détaillée"
+                  >
+                    <Info className="w-4 h-4 text-blue-500" />
+                  </button>
+                  <Target className="w-5 h-5 text-blue-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-blue-600">{formatNumber(parseFloat(aiAnalysis.kpis.optimalRiskPerTrade.replace(/[\$,]/g, '')))}</div>
+              <div className="text-2xl font-bold text-blue-600">${formatNumber(parseFloat(aiAnalysis.kpis.optimalRiskPerTrade.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Par trade recommandé</div>
             </div>
 
             <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-slate-600">GAIN MIN REQUIS</h3>
-                <TrendingUp className="w-5 h-5 text-green-500" />
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => showInfo('minDailyGainRequired')}
+                    className="p-1 hover:bg-green-100 rounded-full transition-colors"
+                    title="Voir explication détaillée"
+                  >
+                    <Info className="w-4 h-4 text-green-500" />
+                  </button>
+                  <TrendingUp className="w-5 h-5 text-green-500" />
+                </div>
               </div>
-              <div className="text-2xl font-bold text-green-600">{formatNumber(parseFloat(aiAnalysis.kpis.minDailyGainRequired.replace(/[\$,]/g, '')))}</div>
+              <div className="text-2xl font-bold text-green-600">${formatNumber(parseFloat(aiAnalysis.kpis.minDailyGainRequired.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Par jour pour objectif</div>
             </div>
 
@@ -129,11 +199,28 @@ const DirecteurIA = ({
             }`}>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-sm font-medium text-slate-600">DRAWDOWN STATUS</h3>
-                <Shield className={`w-5 h-5 ${
-                  aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-500' :
-                  aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-500' :
-                  'text-green-500'
-                }`} />
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => showInfo('drawdownStatus')}
+                    className={`p-1 rounded-full transition-colors ${
+                      aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'hover:bg-red-100' :
+                      aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'hover:bg-orange-100' :
+                      'hover:bg-green-100'
+                    }`}
+                    title="Voir explication détaillée"
+                  >
+                    <Info className={`w-4 h-4 ${
+                      aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-500' :
+                      aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-500' :
+                      'text-green-500'
+                    }`} />
+                  </button>
+                  <Shield className={`w-5 h-5 ${
+                    aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-500' :
+                    aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-500' :
+                    'text-green-500'
+                  }`} />
+                </div>
               </div>
               <div className={`text-2xl font-bold ${
                 aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-600' :
@@ -149,26 +236,62 @@ const DirecteurIA = ({
           {/* Métriques Secondaires */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div className="text-sm font-medium text-slate-600">TRADES RESTANTS</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-slate-600">TRADES RESTANTS</div>
+                <button
+                  onClick={() => showInfo('tradesLeftBudget')}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  title="Voir explication détaillée"
+                >
+                  <Info className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
               <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.tradesLeftBudget}</div>
               <div className="text-xs text-slate-500">Dans budget risque</div>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div className="text-sm font-medium text-slate-600">JOURS RESTANTS</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-slate-600">JOURS RESTANTS</div>
+                <button
+                  onClick={() => showInfo('daysToTarget')}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  title="Voir explication détaillée"
+                >
+                  <Info className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
               <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.daysToTarget}</div>
               <div className="text-xs text-slate-500">Pour atteindre objectif</div>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div className="text-sm font-medium text-slate-600">WIN RATE REQUIS</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-slate-600">WIN RATE REQUIS</div>
+                <button
+                  onClick={() => showInfo('winRateRequired')}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  title="Voir explication détaillée"
+                >
+                  <Info className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
               <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.winRateRequired}</div>
               <div className="text-xs text-slate-500">Pour réussir objectif</div>
             </div>
 
             <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
-              <div className="text-sm font-medium text-slate-600">CAPITAL À RISQUE</div>
-              <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.capitalAtRisk}</div>
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-slate-600">CAPITAL À RISQUE</div>
+                <button
+                  onClick={() => showInfo('capitalAtRisk')}
+                  className="p-1 hover:bg-slate-200 rounded-full transition-colors"
+                  title="Voir explication détaillée"
+                >
+                  <Info className="w-4 h-4 text-slate-500" />
+                </button>
+              </div>
+              <div className="text-xl font-bold text-slate-900">${aiAnalysis.kpis.capitalAtRisk}</div>
               <div className="text-xs text-slate-500">Exposition totale</div>
             </div>
           </div>
@@ -328,6 +451,41 @@ const DirecteurIA = ({
                   <span>Assessment de risque temps réel</span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'Information */}
+      {showInfoModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg mx-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold text-slate-900 flex items-center">
+                <Info className="w-6 h-6 mr-2 text-blue-600" />
+                {infoContent.title}
+              </h3>
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="text-slate-500 hover:text-slate-700 p-1 rounded-full hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="prose prose-sm max-w-none">
+              <div className="text-slate-700 whitespace-pre-line leading-relaxed">
+                {infoContent.description}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowInfoModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Compris
+              </button>
             </div>
           </div>
         </div>
