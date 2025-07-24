@@ -1,0 +1,2303 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Calculator, TrendingUp, AlertTriangle, DollarSign, Target, 
+  TrendingDown, Calendar, Brain, Shield, BarChart3, PieChart,
+  Settings, Bell, User, Menu, X, Activity, Zap, Eye, Lock, CheckCircle, AlertCircle,
+  Cpu, Bot, LineChart, Flame, Skull, Download, Upload, Trash2, Save
+} from 'lucide-react';
+import { contracts } from '../constants/contracts';
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { dataManager } from '../utils/dataManager';
+import { aiProviderManager, formatFinancialDirectorPrompt } from '../utils/aiProviders';
+
+const MethodeAlpha = () => {
+  // États existants avec localStorage
+  const [capital, setCapital] = useLocalStorage('methodealpha_capital', '');
+  const [riskPerTrade, setRiskPerTrade] = useLocalStorage('methodealpha_riskPerTrade', 1);
+  const [dailyLossMax, setDailyLossMax] = useLocalStorage('methodealpha_dailyLossMax', 3);
+  const [stopLossTicks, setStopLossTicks] = useLocalStorage('methodealpha_stopLossTicks', '');
+  const [results, setResults] = useLocalStorage('methodealpha_results', null);
+
+  // États pour le suivi avec localStorage
+  const [initialCapital, setInitialCapital] = useLocalStorage('methodealpha_initialCapital', '');
+  const [currentBalance, setCurrentBalance] = useLocalStorage('methodealpha_currentBalance', '');
+  const [weeklyTarget, setWeeklyTarget] = useLocalStorage('methodealpha_weeklyTarget', 2);
+  const [monthlyTarget, setMonthlyTarget] = useLocalStorage('methodealpha_monthlyTarget', 8);
+  const [recommendations, setRecommendations] = useLocalStorage('methodealpha_recommendations', null);
+
+  // États UI avec localStorage
+  const [activeTab, setActiveTab] = useLocalStorage('methodealpha_activeTab', 'dashboard');
+  const [sidebarOpen, setSidebarOpen] = useLocalStorage('methodealpha_sidebarOpen', true);
+  const [secureMode, setSecureMode] = useLocalStorage('methodealpha_secureMode', false);
+
+  // États Journal de Trading avec localStorage
+  const [tradingJournal, setTradingJournal] = useLocalStorage('methodealpha_tradingJournal', {});
+  const [showDayModal, setShowDayModal] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [dayData, setDayData] = useState({ pnl: '', notes: '', hasTraded: true });
+
+  // États pour IA et Protection avec localStorage
+  const [aiAnalysis, setAiAnalysis] = useLocalStorage('methodealpha_aiAnalysis', null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [drawdownProtection, setDrawdownProtection] = useLocalStorage('methodealpha_drawdownProtection', null);
+  const [monthlyPeak, setMonthlyPeak] = useLocalStorage('methodealpha_monthlyPeak', 0);
+  const [emergencyMode, setEmergencyMode] = useLocalStorage('methodealpha_emergencyMode', false);
+  const [anthropicApiKey, setAnthropicApiKey] = useLocalStorage('methodealpha_anthropicApiKey', '');
+  
+  // New AI Provider states
+  const [aiProvider, setAiProvider] = useLocalStorage('methodealpha_aiProvider', 'anthropic');
+  const [openAiApiKey, setOpenAiApiKey] = useLocalStorage('methodealpha_openAiApiKey', '');
+  const [googleApiKey, setGoogleApiKey] = useLocalStorage('methodealpha_googleApiKey', '');
+  const [selectedModel, setSelectedModel] = useLocalStorage('methodealpha_selectedModel', {
+    anthropic: 'claude-3-5-sonnet-20241022',
+    openai: 'gpt-3.5-turbo',
+    google: 'gemini-pro'
+  });
+  
+  // AI Recommendations state for Calculator integration
+  const [aiRecommendedRisk, setAiRecommendedRisk] = useState(null);
+  const [aiRecommendedDailyLoss, setAiRecommendedDailyLoss] = useState(null);
+  const [isUsingAiRecommendations, setIsUsingAiRecommendations] = useState(false);
+
+  // Calcul du capital actuel basé sur le journal
+  const calculateCurrentBalanceFromJournal = () => {
+    const initialCapitalNum = parseFloat(initialCapital);
+    if (!initialCapitalNum) return null;
+    
+    const totalPnL = Object.values(tradingJournal).reduce((sum, day) => {
+      if (day.hasTraded && day.pnl) {
+        return sum + parseFloat(day.pnl);
+      }
+      return sum;
+    }, 0);
+    
+    return parseFloat((initialCapitalNum + totalPnL).toFixed(2));
+  };
+
+  // NOUVEAU : Calcul du Drawdown Dynamique
+  const calculateDrawdownProtection = () => {
+    const calculatedBalance = calculateCurrentBalanceFromJournal();
+    const currentBalanceNum = calculatedBalance || parseFloat(currentBalance);
+    const initialCapitalNum = parseFloat(initialCapital);
+    
+    if (!currentBalanceNum || !initialCapitalNum) return null;
+
+    // Calcul du pic mensuel (plus haut capital ce mois-ci)
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    let monthlyPeakValue = initialCapitalNum;
+    let peakDate = null;
+    
+    // Calculer le capital jour par jour ce mois-ci
+    const sortedEntries = Object.entries(tradingJournal)
+      .filter(([dateKey, dayData]) => {
+        const tradeDate = new Date(dateKey);
+        return tradeDate >= firstDayOfMonth && dayData.hasTraded;
+      })
+      .sort(([a], [b]) => new Date(a) - new Date(b));
+    
+    let runningBalance = initialCapitalNum;
+    
+    // Recalculer le capital à chaque jour pour trouver le pic
+    const dailyBalances = [];
+    for (const [dateKey, dayData] of sortedEntries) {
+      if (dayData.pnl) {
+        runningBalance += parseFloat(dayData.pnl);
+        dailyBalances.push({ date: dateKey, balance: runningBalance });
+        
+        if (runningBalance > monthlyPeakValue) {
+          monthlyPeakValue = runningBalance;
+          peakDate = dateKey;
+        }
+      }
+    }
+
+    const drawdownAmount = monthlyPeakValue - currentBalanceNum;
+    const drawdownPercent = (drawdownAmount / monthlyPeakValue) * 100;
+    
+    // Seuils de protection dynamiques
+    let protectionLevel = 'safe';
+    let riskMultiplier = 1;
+    let alert = null;
+    
+    if (drawdownPercent >= 8) {
+      protectionLevel = 'emergency';
+      riskMultiplier = 0.2;
+      alert = {
+        type: 'error',
+        title: '🚨 ALERTE ROUGE - Mode Survie',
+        message: 'Drawdown critique ! Réduction risque à 20%. Arrêt trading recommandé.',
+        color: 'red'
+      };
+    } else if (drawdownPercent >= 5) {
+      protectionLevel = 'danger';
+      riskMultiplier = 0.3;
+      alert = {
+        type: 'warning',
+        title: '⚠️ ALERTE ORANGE - Drawdown Élevé',
+        message: 'Protection activée. Risque réduit à 30%. Trading défensif requis.',
+        color: 'orange'
+      };
+    } else if (drawdownPercent >= 3) {
+      protectionLevel = 'warning';
+      riskMultiplier = 0.6;
+      alert = {
+        type: 'caution',
+        title: '🟡 Attention - Drawdown Modéré',
+        message: 'Vigilance requise. Risque réduit à 60%. Soyez sélectif.',
+        color: 'yellow'
+      };
+    } else if (drawdownPercent >= 1.5) {
+      protectionLevel = 'caution';
+      riskMultiplier = 0.8;
+      alert = {
+        type: 'info',
+        title: '🔵 Surveillance - Léger Drawdown',
+        message: 'Drawdown détecté. Risque réduit à 80%. Restez discipliné.',
+        color: 'blue'
+      };
+    }
+
+    return {
+      monthlyPeak: monthlyPeakValue,
+      peakDate,
+      currentBalance: currentBalanceNum,
+      drawdownAmount,
+      drawdownPercent,
+      protectionLevel,
+      riskMultiplier,
+      alert,
+      daysInDrawdown: peakDate ? Math.floor((new Date() - new Date(peakDate)) / (1000 * 60 * 60 * 24)) : 0
+    };
+  };
+
+  // NOUVEAU : Analyse IA comme Directeur Financier
+  const performFinancialDirectorAnalysis = async () => {
+    console.log('Starting AI analysis...');
+    console.log('Current AI Provider:', aiProvider);
+    
+    const currentApiKey = aiProviderManager.getApiKey(aiProvider);
+    if (!currentApiKey) {
+      alert(`Veuillez configurer votre clé API ${aiProvider.toUpperCase()} dans les paramètres avant d'utiliser l'analyse IA.`);
+      setIsAnalyzing(false);
+      return;
+    }
+    
+    setIsAnalyzing(true);
+    
+    try {
+      const calculatedBalance = calculateCurrentBalanceFromJournal();
+      const currentBalanceNum = calculatedBalance || parseFloat(currentBalance);
+      const initialCapitalNum = parseFloat(initialCapital);
+      const drawdown = calculateDrawdownProtection();
+      const stats = getJournalStats();
+      
+      // Calculs KPIs temps réel avec données du mois actuel
+      const today = new Date();
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+      
+      // Calculate MONTHLY performance (not all-time)
+      let monthlyStartCapital = initialCapitalNum;
+      let currentMonthPnL = 0;
+      
+      // Get all trades for current month
+      Object.entries(tradingJournal).forEach(([dateKey, dayData]) => {
+        const tradeDate = new Date(dateKey);
+        if (tradeDate >= firstDayOfMonth && dayData.hasTraded && dayData.pnl) {
+          currentMonthPnL += parseFloat(dayData.pnl);
+        }
+      });
+      
+      const currentMonthlyReturn = (currentMonthPnL / monthlyStartCapital) * 100;
+      const targetAchieved = currentMonthlyReturn >= monthlyTarget;
+      const requiredGainToTarget = targetAchieved ? 0 : ((monthlyTarget - currentMonthlyReturn) / 100) * monthlyStartCapital;
+      
+      // Adjust risk based on performance
+      let adjustedRiskPercent = riskPerTrade;
+      if (targetAchieved) {
+        // Target achieved - reduce risk significantly
+        adjustedRiskPercent = Math.min(0.5, riskPerTrade * 0.3); // Max 0.5% when target achieved
+      } else if (currentMonthlyReturn > monthlyTarget * 0.8) {
+        // Close to target - be conservative
+        adjustedRiskPercent = riskPerTrade * 0.5;
+      } else if (stats.consecutiveLosses >= 2) {
+        // Losing streak - reduce risk
+        adjustedRiskPercent = riskPerTrade * 0.5;
+      }
+      
+      const maxLossAllowed = currentBalanceNum * (dailyLossMax / 100);
+      const optimalRiskPerTrade = currentBalanceNum * (adjustedRiskPercent / 100);
+      
+      // Données pour l'IA Directeur Financier
+      const financialData = {
+        // Capital et Performance
+        initialCapital: initialCapitalNum,
+        currentCapital: currentBalanceNum,
+        monthlyStartCapital: monthlyStartCapital,
+        currentMonthPnL: currentMonthPnL,
+        monthlyReturn: currentMonthlyReturn,
+        targetReturn: monthlyTarget,
+        targetAchieved: targetAchieved,
+        gapToTarget: requiredGainToTarget,
+        
+        // Temporal Analysis
+        daysLeftInMonth: daysLeftInMonth,
+        tradingDaysLeft: Math.floor(daysLeftInMonth * 0.71), // Environ 5/7 jours sont trading
+        currentDayOfMonth: today.getDate(),
+        
+        // Risk Metrics
+        currentDrawdown: drawdown?.drawdownPercent || 0,
+        maxDrawdownAllowed: 8, // Seuil critique
+        maxDailyLoss: maxLossAllowed,
+        currentRiskPerTrade: optimalRiskPerTrade,
+        adjustedRiskPercent: adjustedRiskPercent,
+        originalRiskPercent: riskPerTrade,
+        
+        // Performance Metrics
+        winRate: stats.winRate,
+        profitFactor: stats.profitFactor,
+        avgWin: stats.avgWin,
+        avgLoss: stats.avgLoss,
+        consecutiveLosses: stats.consecutiveLosses,
+        totalTrades: stats.totalTrades,
+        monthlyTrades: Object.entries(tradingJournal).filter(([dateKey, dayData]) => {
+          const tradeDate = new Date(dateKey);
+          return tradeDate >= firstDayOfMonth && dayData.hasTraded;
+        }).length,
+        
+        // Market Context
+        volatilityLevel: stats.consecutiveLosses >= 2 ? "HIGH" : stats.winRate >= 60 ? "LOW" : "MEDIUM",
+        tradingEfficiency: stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) : 0,
+        
+        // Trading Behavior
+        avgTradesPerDay: stats.totalTrades / Math.max(1, Object.keys(tradingJournal).length),
+        overtradingRisk: stats.totalTrades > 20 ? "HIGH" : stats.totalTrades > 10 ? "MEDIUM" : "LOW"
+      };
+
+      console.log('Making API request with provider:', aiProvider);
+      
+      // Use the AI provider manager to make the request
+      const messages = formatFinancialDirectorPrompt(financialData);
+      const responseText = await aiProviderManager.makeRequest(messages, {
+        model: selectedModel[aiProvider],
+        maxTokens: 2000
+      });
+      
+      console.log('AI Response received');
+      
+      // Parse the response (remove any markdown code blocks)
+      let cleanedResponse = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+      console.log('Parsed response text:', cleanedResponse);
+      
+      const analysis = JSON.parse(cleanedResponse);
+      
+      // Rename financialDirectives to aiRecommendations if needed
+      if (analysis.financialDirectives && !analysis.aiRecommendations) {
+        analysis.aiRecommendations = analysis.financialDirectives;
+        delete analysis.financialDirectives;
+      }
+      
+      setAiAnalysis(analysis);
+      console.log('Analysis set successfully');
+      
+      // Extract AI recommendations for Calculator
+      if (analysis.kpis) {
+        // Extract risk per trade value (remove $ and convert to number)
+        const optimalRisk = parseFloat(analysis.kpis.optimalRiskPerTrade.replace('$', ''));
+        const maxDailyLoss = parseFloat(analysis.kpis.maxLossToday.replace('$', ''));
+        
+        // Calculate risk percentage based on current balance
+        const currentCapital = calculatedBalance || parseFloat(currentBalance);
+        if (currentCapital && optimalRisk) {
+          const riskPercentage = (optimalRisk / currentCapital) * 100;
+          setAiRecommendedRisk(riskPercentage);
+        }
+        
+        if (currentCapital && maxDailyLoss) {
+          const dailyLossPercentage = (maxDailyLoss / currentCapital) * 100;
+          setAiRecommendedDailyLoss(dailyLossPercentage);
+        }
+      }
+      
+    } catch (error) {
+      console.error("Erreur analyse Directeur Financier:", error);
+      alert(`Erreur lors de l'analyse IA: ${error.message}\n\nVérifiez votre clé API dans les paramètres.`);
+      
+      // Fallback avec calculs locaux
+      const calculatedBalance = calculateCurrentBalanceFromJournal();
+      const currentBalanceNum = calculatedBalance || parseFloat(currentBalance);
+      const today = new Date();
+      const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+      const currentReturn = ((currentBalanceNum - parseFloat(initialCapital)) / parseFloat(initialCapital)) * 100;
+      const requiredGain = ((monthlyTarget - currentReturn) / 100) * parseFloat(initialCapital);
+      const drawdown = calculateDrawdownProtection();
+      const stats = getJournalStats();
+      
+      setAiAnalysis({
+        executiveSummary: {
+          status: drawdown?.protectionLevel === 'emergency' ? "CRITICAL" : 
+                  drawdown?.protectionLevel === 'danger' ? "DANGER" : 
+                  currentReturn >= monthlyTarget ? "SAFE" : "CAUTION",
+          headline: error.message.includes('API') ? 
+            "❌ Analyse IA indisponible - KPIs calculés localement" : 
+            `Capital: ${currentBalanceNum.toFixed(2)} | Objectif: ${currentReturn >= 0 ? 'En cours' : 'À rattraper'}`,
+          priority: drawdown?.protectionLevel === 'emergency' ? "ARRÊT IMMÉDIAT DU TRADING" :
+                   stats.consecutiveLosses >= 3 ? "PAUSE ET ANALYSE REQUISE" :
+                   "CONTINUER SELON PLAN"
+        },
+        kpis: {
+          maxLossToday: `${(currentBalanceNum * dailyLossMax / 100).toFixed(2)}`,
+          optimalRiskPerTrade: `${(currentBalanceNum * riskPerTrade / 100).toFixed(2)}`,
+          minDailyGainRequired: daysLeftInMonth > 0 ? `${(requiredGain / daysLeftInMonth).toFixed(2)}` : "$0",
+          drawdownStatus: drawdown?.protectionLevel || "OK",
+          tradesLeftBudget: Math.floor((currentBalanceNum * dailyLossMax / 100) / (currentBalanceNum * riskPerTrade / 100)),
+          daysToTarget: daysLeftInMonth,
+          winRateRequired: "Calcul indisponible (IA offline)",
+          capitalAtRisk: `${((currentBalanceNum * riskPerTrade / 100) / currentBalanceNum * 100).toFixed(1)}%`
+        },
+        aiRecommendations: [
+          "Vérifiez votre clé API Anthropic pour l'analyse complète",
+          "Suivez les alertes de protection drawdown",
+          "Respectez strictement les limites de risque configurées"
+        ],
+        riskAssessment: {
+          level: drawdown?.protectionLevel === 'emergency' ? "EXTREME" : 
+                 drawdown?.protectionLevel === 'danger' ? "HIGH" : "MEDIUM",
+          factors: ["Service IA temporairement indisponible", "Calculs basés sur données locales"],
+          recommendation: "Activez l'IA pour une analyse complète"
+        },
+        marketStrategy: {
+          approach: currentReturn >= monthlyTarget ? "DEFENSIVE" : "BALANCED",
+          reasoning: "Mode conservateur en attendant l'analyse IA complète",
+          nextAction: "Configurez l'API Claude pour analyse temps réel"
+        }
+      });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
+  // Fonctions existantes pour le calendrier
+  const getDaysInMonth = (date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  };
+
+  const getFirstDayOfMonth = (date) => {
+    const firstDay = new Date(date.getFullYear(), date.getMonth(), 1).getDay();
+    return firstDay === 0 ? 7 : firstDay;
+  };
+
+  const getDateKey = (year, month, day) => {
+    return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  const getDayStatus = (dateKey) => {
+    const dayData = tradingJournal[dateKey];
+    if (!dayData) return 'no-data';
+    if (!dayData.hasTraded) return 'no-trade';
+    const pnl = parseFloat(dayData.pnl) || 0;
+    return pnl > 0 ? 'profit' : pnl < 0 ? 'loss' : 'breakeven';
+  };
+
+  const handleDayClick = (year, month, day) => {
+    const dateKey = getDateKey(year, month, day);
+    const existingData = tradingJournal[dateKey] || { pnl: '', notes: '', hasTraded: true };
+    setSelectedDate({ year, month, day, dateKey });
+    setDayData(existingData);
+    setShowDayModal(true);
+  };
+
+  const saveDayData = () => {
+    if (!selectedDate) return;
+    
+    setTradingJournal(prev => ({
+      ...prev,
+      [selectedDate.dateKey]: { ...dayData }
+    }));
+    
+    setShowDayModal(false);
+    setSelectedDate(null);
+    setDayData({ pnl: '', notes: '', hasTraded: true });
+  };
+
+  // Stats du journal
+  const getJournalStats = () => {
+    const entries = Object.values(tradingJournal).filter(day => day.hasTraded);
+    const profits = entries.filter(day => parseFloat(day.pnl) > 0);
+    const losses = entries.filter(day => parseFloat(day.pnl) < 0);
+    
+    const totalPnL = entries.reduce((sum, day) => sum + (parseFloat(day.pnl) || 0), 0);
+    const winRate = entries.length > 0 ? (profits.length / entries.length * 100) : 0;
+    const avgWin = profits.length > 0 ? profits.reduce((sum, day) => sum + parseFloat(day.pnl), 0) / profits.length : 0;
+    const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((sum, day) => sum + parseFloat(day.pnl), 0) / losses.length) : 0;
+    
+    // Pattern Analysis
+    const recentTrades = entries.slice(-5);
+    const consecutiveLosses = recentTrades.reverse().findIndex(day => parseFloat(day.pnl) >= 0);
+    const actualConsecutiveLosses = consecutiveLosses === -1 ? recentTrades.length : consecutiveLosses;
+    
+    return {
+      totalTrades: entries.length,
+      winningTrades: profits.length,
+      losingTrades: losses.length,
+      totalPnL,
+      winRate,
+      avgWin,
+      avgLoss,
+      consecutiveLosses: actualConsecutiveLosses,
+      profitFactor: avgLoss > 0 ? (avgWin * profits.length) / (avgLoss * losses.length) : 0
+    };
+  };
+
+  // NOUVEAU : Calcul avancé avec protection IA
+  const calculateSmartRecommendations = () => {
+    const calculatedBalance = calculateCurrentBalanceFromJournal();
+    const currentBalanceNum = calculatedBalance || parseFloat(currentBalance);
+    const initialCapitalNum = parseFloat(initialCapital);
+    
+    if (!currentBalanceNum || !initialCapitalNum) return null;
+
+    const totalPnL = currentBalanceNum - initialCapitalNum;
+    const totalPnLPercent = (totalPnL / initialCapitalNum) * 100;
+    
+    const today = new Date();
+    const dayOfWeek = today.getDay();
+    const daysFromMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    
+    const mondayOfThisWeek = new Date(today);
+    mondayOfThisWeek.setDate(today.getDate() - daysFromMonday);
+    mondayOfThisWeek.setHours(0, 0, 0, 0);
+    
+    const weeklyPnL = Object.entries(tradingJournal).reduce((sum, [dateKey, dayData]) => {
+      if (!dayData.hasTraded || !dayData.pnl) return sum;
+      const tradeDate = new Date(dateKey);
+      if (tradeDate >= mondayOfThisWeek) {
+        return sum + parseFloat(dayData.pnl);
+      }
+      return sum;
+    }, 0);
+    
+    const weeklyPnLPercent = (weeklyPnL / initialCapitalNum) * 100;
+    
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthlyPnL = Object.entries(tradingJournal).reduce((sum, [dateKey, dayData]) => {
+      if (!dayData.hasTraded || !dayData.pnl) return sum;
+      const tradeDate = new Date(dateKey);
+      if (tradeDate >= firstDayOfMonth) {
+        return sum + parseFloat(dayData.pnl);
+      }
+      return sum;
+    }, 0);
+    
+    const monthlyPnLPercent = (monthlyPnL / initialCapitalNum) * 100;
+
+    // Intégration du système de protection drawdown
+    const drawdownProtection = calculateDrawdownProtection();
+    const stats = getJournalStats();
+    
+    let status = 'neutral';
+    let riskAdjustment = 1;
+    let message = '';
+    let suggestions = [];
+    let nextTradeAdvice = '';
+
+    // APPLICATION DE LA PROTECTION DRAWDOWN
+    if (drawdownProtection?.protectionLevel === 'emergency') {
+      status = 'emergency';
+      riskAdjustment = 0.2;
+      message = `🚨 MODE SURVIE ACTIVÉ`;
+      suggestions = [
+        '🚨 STOP TRADING - Drawdown critique',
+        'Analysez vos erreurs avant de reprendre',
+        'Considérez une pause de 24-48h',
+        'Mode survival : protection capitale maximum'
+      ];
+    } else if (drawdownProtection?.protectionLevel === 'danger') {
+      status = 'danger';
+      riskAdjustment = drawdownProtection.riskMultiplier;
+      message = `⚠️ PROTECTION DRAWDOWN ACTIVE`;
+      suggestions = [
+        '⚠️ Trading défensif uniquement',
+        'Setups haute probabilité seulement',
+        'Évitez absolument le revenge trading',
+        `Drawdown: ${drawdownProtection.drawdownPercent.toFixed(1)}%`
+      ];
+    } else if (stats.consecutiveLosses >= 3) {
+      status = 'pattern_warning';
+      riskAdjustment = 0.5;
+      message = `🔴 ALERTE PATTERN - ${stats.consecutiveLosses} pertes consécutives`;
+      suggestions = [
+        `🔴 ${stats.consecutiveLosses} pertes d'affilée détectées`,
+        'PAUSE obligatoire recommandée',
+        'Analysez votre état psychologique',
+        'Reprenez avec micro-positions'
+      ];
+    } else if (monthlyPnLPercent >= monthlyTarget) {
+      status = 'monthly_achieved';
+      riskAdjustment = 0.2;
+      message = `🏆 OBJECTIF MENSUEL ATTEINT !`;
+      suggestions = [
+        '🏆 BRAVO ! Objectif mensuel réalisé',
+        'MODE CAPITAL PRESERVATION',
+        'Plus aucun risque nécessaire ce mois',
+        'Profitez de votre succès !'
+      ];
+    } else if (weeklyPnLPercent >= weeklyTarget) {
+      status = 'weekly_achieved';
+      riskAdjustment = 0.4;
+      message = `🎯 Objectif hebdomadaire atteint !`;
+      suggestions = [
+        '🎯 Excellent ! Objectif hebdo atteint',
+        'Mode conservateur automatique',
+        'Protégez vos gains acquis',
+        'Trading sélectif uniquement'
+      ];
+    } else {
+      // Application de la protection drawdown normale
+      if (drawdownProtection) {
+        riskAdjustment *= drawdownProtection.riskMultiplier;
+      }
+      
+      message = `📈 En progression`;
+      suggestions = [
+        'Progression normale, continuez !',
+        'Respectez votre plan de trading',
+        `Reste ${(weeklyTarget - weeklyPnLPercent).toFixed(2)}% pour l'objectif hebdo`,
+        'Discipline et patience'
+      ];
+    }
+
+    // Calcul du conseil de trade
+    const finalRisk = riskPerTrade * riskAdjustment * (secureMode ? 0.5 : 1);
+    const riskAmount = (currentBalanceNum * finalRisk) / 100;
+    
+    nextTradeAdvice = `Prochain trade : ${finalRisk.toFixed(2)}% du capital (${riskAmount.toFixed(2)}$)`;
+
+    return {
+      totalPnL, totalPnLPercent, weeklyPnL, weeklyPnLPercent,
+      monthlyPnL, monthlyPnLPercent, weeklyTarget, monthlyTarget,
+      status, riskAdjustment, message, suggestions, nextTradeAdvice,
+      adjustedRiskPercent: finalRisk,
+      maxRiskAmount: riskAmount,
+      weekProgress: Math.min(100, Math.abs(weeklyPnLPercent / weeklyTarget) * 100),
+      monthProgress: Math.min(100, Math.abs(monthlyPnLPercent / monthlyTarget) * 100),
+      daysFromMonday: daysFromMonday + 1,
+      drawdownProtection: drawdownProtection,
+      patternWarning: stats.consecutiveLosses >= 2
+    };
+  };
+
+  const calculatePositionSize = () => {
+    const calculatedBalance = calculateCurrentBalanceFromJournal();
+    const capitalNum = calculatedBalance || parseFloat(currentBalance || capital);
+    const stopLossTicksNum = parseFloat(stopLossTicks);
+    
+    if (!capitalNum || capitalNum <= 0 || !stopLossTicksNum || stopLossTicksNum <= 0) {
+      setResults(null);
+      return;
+    }
+
+    const smartRec = calculateSmartRecommendations();
+    const effectiveRiskPercent = smartRec ? smartRec.adjustedRiskPercent : riskPerTrade;
+    
+    const maxRiskPerTrade = (capitalNum * effectiveRiskPercent) / 100;
+    const maxDailyLoss = (capitalNum * dailyLossMax) / 100;
+    const maxTradesPerDay = Math.floor(maxDailyLoss / maxRiskPerTrade);
+    
+    const positionRecommendations = [];
+
+    Object.entries(contracts).forEach(([symbol, contract]) => {
+      const lossPerContract = stopLossTicksNum * contract.tickValue;
+      const maxContractsByRisk = Math.floor(maxRiskPerTrade / lossPerContract);
+      const maxContractsByMargin = Math.floor(capitalNum / contract.margin);
+      const recommendedContracts = Math.min(maxContractsByRisk, maxContractsByMargin);
+      
+      if (recommendedContracts > 0) {
+        const totalRisk = recommendedContracts * lossPerContract;
+        const totalMargin = recommendedContracts * contract.margin;
+        const riskPercent = (totalRisk / capitalNum) * 100;
+        const marginPercent = (totalMargin / capitalNum) * 100;
+        
+        positionRecommendations.push({
+          symbol, contract, recommendedContracts, totalRisk, totalMargin,
+          riskPercent, marginPercent, lossPerContract, maxContractsByRisk,
+          maxContractsByMargin,
+          potential1to1: totalRisk,
+          potential1to2: totalRisk * 2,
+          potential1to3: totalRisk * 3
+        });
+      }
+    });
+
+    positionRecommendations.sort((a, b) => b.recommendedContracts - a.recommendedContracts);
+
+    setResults({
+      capital: capitalNum, maxRiskPerTrade, maxDailyLoss, maxTradesPerDay,
+      stopLossTicks: stopLossTicksNum, effectiveRiskPercent,
+      originalRiskPercent: riskPerTrade, recommendations: positionRecommendations
+    });
+
+    setRecommendations(smartRec);
+    setDrawdownProtection(smartRec?.drawdownProtection);
+  };
+
+  // Initialize AI providers
+  useEffect(() => {
+    // Set up API keys in the provider manager
+    aiProviderManager.setApiKey('anthropic', anthropicApiKey);
+    aiProviderManager.setApiKey('openai', openAiApiKey);
+    aiProviderManager.setApiKey('google', googleApiKey);
+    
+    // Set current provider
+    aiProviderManager.setCurrentProvider(aiProvider.toUpperCase());
+  }, [anthropicApiKey, openAiApiKey, googleApiKey, aiProvider]);
+
+  useEffect(() => {
+    calculatePositionSize();
+  }, [capital, currentBalance, riskPerTrade, dailyLossMax, stopLossTicks, initialCapital, weeklyTarget, monthlyTarget, secureMode, tradingJournal]);
+
+  const getStatusStyles = (status) => {
+    switch (status) {
+      case 'emergency':
+        return 'from-red-600 to-red-800 text-white';
+      case 'danger':
+        return 'from-orange-500 to-red-500 text-white';
+      case 'pattern_warning':
+        return 'from-red-500 to-rose-600 text-white';
+      case 'weekly_achieved':
+      case 'monthly_achieved':
+        return 'from-emerald-500 to-green-600 text-white';
+      case 'approaching_target':
+        return 'from-blue-500 to-indigo-600 text-white';
+      case 'warning':
+        return 'from-orange-500 to-yellow-500 text-white';
+      default:
+        return 'from-slate-500 to-gray-600 text-white';
+    }
+  };
+
+  const handleQuickAction = (action) => {
+    switch(action) {
+      case 'calculator':
+        setActiveTab('calculator');
+        break;
+      case 'analyze':
+        performFinancialDirectorAnalysis();
+        break;
+      case 'secure':
+        setSecureMode(!secureMode);
+        break;
+    }
+  };
+  
+  // Apply AI recommendations to Calculator
+  const applyAiRecommendations = () => {
+    if (aiRecommendedRisk !== null) {
+      setRiskPerTrade(aiRecommendedRisk);
+    }
+    if (aiRecommendedDailyLoss !== null) {
+      setDailyLossMax(aiRecommendedDailyLoss);
+    }
+    setIsUsingAiRecommendations(true);
+    setActiveTab('calculator');
+    
+    // Show success message
+    alert('Les recommandations IA ont été appliquées au calculateur!');
+  };
+
+  const navigation = [
+    { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
+    { id: 'calculator', name: 'Calculateur', icon: Calculator },
+    { id: 'journal', name: 'Journal', icon: Calendar },
+    { id: 'ai-analysis', name: 'Directeur IA', icon: Brain },
+    { id: 'settings', name: 'Paramètres', icon: Settings },
+  ];
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+      {/* Header */}
+      <header className="bg-white border-b border-slate-200 shadow-sm">
+        <div className="flex items-center justify-between px-6 py-4">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="text-slate-600 hover:text-slate-900 lg:hidden"
+            >
+              {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </button>
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
+                <Zap className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  Méthode Alpha AI
+                </h1>
+                <p className="text-sm text-slate-500">Smart Risk Management System</p>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            {/* Indicateurs de statut */}
+            {drawdownProtection?.alert && (
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm font-medium ${
+                drawdownProtection.alert.color === 'red' ? 'bg-red-100 text-red-800' :
+                drawdownProtection.alert.color === 'orange' ? 'bg-orange-100 text-orange-800' :
+                drawdownProtection.alert.color === 'yellow' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                <AlertTriangle className="w-4 h-4" />
+                <span>{drawdownProtection.protectionLevel.toUpperCase()}</span>
+              </div>
+            )}
+            
+            {secureMode && (
+              <div className="flex items-center space-x-2 bg-orange-100 text-orange-800 px-3 py-1 rounded-full text-sm font-medium">
+                <Lock className="w-4 h-4" />
+                <span>Mode Sécurisé</span>
+              </div>
+            )}
+            
+            <button className="relative p-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors">
+              <Bell className="w-5 h-5" />
+              {drawdownProtection?.alert && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
+            </button>
+            
+            <div className="flex items-center space-x-3 bg-slate-100 rounded-full px-3 py-2">
+              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-sm font-medium text-slate-700">Trader Pro AI</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="flex">
+        {/* Sidebar */}
+        <div className={`${sidebarOpen ? 'w-64' : 'w-16'} transition-all duration-300 bg-white border-r border-slate-200 shadow-sm`}>
+          <nav className="p-4 space-y-2">
+            {navigation.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActiveTab(item.id)}
+                className={`w-full flex items-center space-x-3 px-4 py-3 rounded-xl transition-all duration-200 ${
+                  activeTab === item.id
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white shadow-lg'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <item.icon className="w-5 h-5" />
+                {sidebarOpen && <span className="font-medium">{item.name}</span>}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 p-6 overflow-auto">
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              {/* NOUVELLE Alerte de Protection Drawdown */}
+              {drawdownProtection?.alert && (
+                <div className={`p-6 rounded-2xl shadow-lg border-2 ${
+                  drawdownProtection.alert.color === 'red' ? 'bg-red-50 border-red-200' :
+                  drawdownProtection.alert.color === 'orange' ? 'bg-orange-50 border-orange-200' :
+                  drawdownProtection.alert.color === 'yellow' ? 'bg-yellow-50 border-yellow-200' :
+                  'bg-blue-50 border-blue-200'
+                }`}>
+                  <div className="flex items-start space-x-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      drawdownProtection.alert.color === 'red' ? 'bg-red-500' :
+                      drawdownProtection.alert.color === 'orange' ? 'bg-orange-500' :
+                      drawdownProtection.alert.color === 'yellow' ? 'bg-yellow-500' :
+                      'bg-blue-500'
+                    }`}>
+                      {drawdownProtection.alert.color === 'red' ? <Skull className="w-6 h-6 text-white" /> : 
+                       <AlertTriangle className="w-6 h-6 text-white" />}
+                    </div>
+                    <div className="flex-1">
+                      <h3 className={`text-xl font-bold mb-2 ${
+                        drawdownProtection.alert.color === 'red' ? 'text-red-900' :
+                        drawdownProtection.alert.color === 'orange' ? 'text-orange-900' :
+                        drawdownProtection.alert.color === 'yellow' ? 'text-yellow-900' :
+                        'text-blue-900'
+                      }`}>
+                        {drawdownProtection.alert.title}
+                      </h3>
+                      <p className={`text-lg mb-4 ${
+                        drawdownProtection.alert.color === 'red' ? 'text-red-800' :
+                        drawdownProtection.alert.color === 'orange' ? 'text-orange-800' :
+                        drawdownProtection.alert.color === 'yellow' ? 'text-yellow-800' :
+                        'text-blue-800'
+                      }`}>
+                        {drawdownProtection.alert.message}
+                      </p>
+                      <div className={`grid md:grid-cols-3 gap-4 text-sm ${
+                        drawdownProtection.alert.color === 'red' ? 'text-red-700' :
+                        drawdownProtection.alert.color === 'orange' ? 'text-orange-700' :
+                        drawdownProtection.alert.color === 'yellow' ? 'text-yellow-700' :
+                        'text-blue-700'
+                      }`}>
+                        <div>
+                          <span className="font-semibold">Pic Mensuel:</span> ${drawdownProtection.monthlyPeak.toFixed(2)}
+                        </div>
+                        <div>
+                          <span className="font-semibold">Drawdown:</span> {drawdownProtection.drawdownPercent.toFixed(2)}%
+                        </div>
+                        <div>
+                          <span className="font-semibold">Jours DD:</span> {drawdownProtection.daysInDrawdown}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* KPI Cards avec nouvelles métriques */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                      <DollarSign className="w-6 h-6 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${recommendations && recommendations.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {recommendations ? `${recommendations.totalPnLPercent >= 0 ? '+' : ''}${recommendations.totalPnLPercent.toFixed(2)}%` : '---'}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900">
+                    ${(() => {
+                      const calculatedBalance = calculateCurrentBalanceFromJournal();
+                      const displayBalance = calculatedBalance || parseFloat(currentBalance);
+                      return displayBalance ? displayBalance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '---';
+                    })()}
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    Capital Actuel {calculateCurrentBalanceFromJournal() ? '(Auto)' : '(Manuel)'}
+                  </p>
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-blue-600 text-sm font-medium">
+                      {drawdownProtection ? `DD: ${drawdownProtection.drawdownPercent.toFixed(1)}%` : 'Semaine'}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900">
+                    {recommendations ? `${recommendations.weeklyPnLPercent.toFixed(2)}%` : '---'}
+                  </h3>
+                  <p className="text-slate-500 text-sm mb-3">Performance Hebdo</p>
+                  {recommendations && (
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          recommendations.weekProgress >= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 
+                          recommendations.weekProgress >= 80 ? 'bg-gradient-to-r from-blue-500 to-indigo-600' : 
+                          'bg-gradient-to-r from-blue-400 to-blue-500'
+                        }`}
+                        style={{ width: `${Math.min(100, recommendations.weekProgress)}%` }}
+                      ></div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <span className="text-purple-600 text-sm font-medium">
+                      {drawdownProtection?.monthlyPeak ? `Pic: ${drawdownProtection.monthlyPeak.toFixed(0)}` : 'Mensuel'}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900">
+                    {recommendations ? `${recommendations.monthlyPnLPercent.toFixed(2)}%` : '---'}
+                  </h3>
+                  <p className="text-slate-500 text-sm mb-3">vs {monthlyTarget}% objectif</p>
+                  {recommendations && (
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          recommendations.monthProgress >= 100 ? 'bg-gradient-to-r from-purple-500 to-pink-600' : 
+                          recommendations.monthProgress >= 80 ? 'bg-gradient-to-r from-purple-400 to-purple-500' : 
+                          'bg-gradient-to-r from-purple-300 to-purple-400'
+                        }`}
+                        style={{ width: `${Math.min(100, recommendations.monthProgress)}%` }}
+                      ></div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      drawdownProtection?.protectionLevel === 'emergency' ? 'bg-gradient-to-r from-red-600 to-red-800' :
+                      drawdownProtection?.protectionLevel === 'danger' ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                      'bg-gradient-to-r from-orange-500 to-red-600'
+                    }`}>
+                      <Shield className="w-6 h-6 text-white" />
+                    </div>
+                    <span className={`text-sm font-medium ${
+                      drawdownProtection?.protectionLevel === 'emergency' ? 'text-red-600' :
+                      drawdownProtection?.protectionLevel === 'danger' ? 'text-orange-600' :
+                      'text-orange-600'
+                    }`}>
+                      {drawdownProtection ? `${(drawdownProtection.riskMultiplier * 100).toFixed(0)}%` : 'Risque'}
+                    </span>
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-900">
+                    {recommendations ? `${recommendations.adjustedRiskPercent.toFixed(2)}%` : `${riskPerTrade.toFixed(2)}%`}
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    {drawdownProtection?.protectionLevel === 'emergency' ? 'SURVIE' :
+                     drawdownProtection?.protectionLevel === 'danger' ? 'PROTECTION' : 
+                     'Par Trade'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Recommandations IA Avancées */}
+              {recommendations && (
+                <div className={`p-6 rounded-2xl shadow-lg bg-gradient-to-r ${getStatusStyles(recommendations.status)}`}>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center space-x-3">
+                      <Brain className="w-8 h-8" />
+                      <div>
+                        <h2 className="text-xl font-bold">{recommendations.message}</h2>
+                        <p className="opacity-90">Assistant IA Money Management Avancé</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold">
+                        {recommendations.totalPnL >= 0 ? '+' : ''}${recommendations.totalPnL.toFixed(2)}
+                      </div>
+                      <div className="opacity-90">P&L Total</div>
+                    </div>
+                  </div>
+                  
+                  {/* Nouveau conseil pour le prochain trade */}
+                  <div className="mb-4 p-4 bg-white/20 backdrop-blur rounded-xl">
+                    <h3 className="font-semibold mb-2 flex items-center">
+                      <AlertCircle className="w-5 h-5 mr-2" />
+                      💡 Conseil IA pour votre prochain trade
+                    </h3>
+                    <p className="text-lg font-medium">{recommendations.nextTradeAdvice}</p>
+                    {recommendations.patternWarning && (
+                      <div className="mt-2 text-sm opacity-90 flex items-center">
+                        <Flame className="w-4 h-4 mr-2" />
+                        Pattern d'échec détecté - Extra prudence requise !
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                      <h3 className="font-semibold mb-3 flex items-center">
+                        <LineChart className="w-5 h-5 mr-2" />
+                        📊 Métriques de Performance
+                      </h3>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span>Cette semaine:</span>
+                          <span className="font-medium">{recommendations.weeklyPnLPercent.toFixed(2)}% / {recommendations.weeklyTarget.toFixed(2)}%</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Ce mois:</span>
+                          <span className="font-medium">{recommendations.monthlyPnLPercent.toFixed(2)}% / {recommendations.monthlyTarget.toFixed(2)}%</span>
+                        </div>
+                        {drawdownProtection && (
+                          <div className="flex justify-between">
+                            <span>Drawdown:</span>
+                            <span className="font-medium">{drawdownProtection.drawdownPercent.toFixed(2)}%</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                      <h3 className="font-semibold mb-3 flex items-center">
+                        <Cpu className="w-5 h-5 mr-2" />
+                        🧠 Recommandations IA
+                      </h3>
+                      <ul className="text-sm space-y-1">
+                        {recommendations.suggestions.slice(0, 3).map((suggestion, index) => (
+                          <li key={index} className="flex items-start space-x-2">
+                            <span className="w-1.5 h-1.5 bg-white rounded-full mt-2 flex-shrink-0"></span>
+                            <span>{suggestion}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Actions avec IA */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                  <Activity className="w-5 h-5 mr-2 text-purple-600" />
+                  Actions Intelligentes
+                </h3>
+                <div className="grid md:grid-cols-3 gap-4">
+                  <button 
+                    onClick={() => handleQuickAction('calculator')}
+                    className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-4 rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2"
+                  >
+                    <Calculator className="w-5 h-5" />
+                    <span>Calculer Position</span>
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleQuickAction('analyze')}
+                    disabled={isAnalyzing}
+                    className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
+                  >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Analyse...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Brain className="w-5 h-5" />
+                        <span>Directeur IA</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  <button 
+                    onClick={() => handleQuickAction('secure')}
+                    className={`px-6 py-4 rounded-xl font-medium hover:shadow-lg transition-all flex items-center justify-center space-x-2 ${
+                      secureMode 
+                        ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white' 
+                        : 'bg-gradient-to-r from-slate-500 to-gray-500 text-white'
+                    }`}
+                  >
+                    <Lock className="w-5 h-5" />
+                    <span>{secureMode ? 'Désactiver' : 'Activer'} Mode Sécurisé</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'ai-analysis' && (
+            <div className="space-y-6">
+              {/* Header Directeur Financier */}
+              <div className="bg-gradient-to-r from-slate-900 to-blue-900 text-white p-6 rounded-2xl shadow-lg">
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-slate-900" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold">Directeur Financier IA</h2>
+                      <p className="text-blue-200">
+                        Analyse Temps Réel • {aiProvider === 'anthropic' ? 'Claude' : aiProvider === 'openai' ? 'ChatGPT' : 'Gemini'} • Performance Maximale
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    {(() => {
+                      const monthlyReturn = recommendations?.monthlyPnLPercent || 0;
+                      const targetAchieved = monthlyReturn >= monthlyTarget;
+                      if (targetAchieved) {
+                        return (
+                          <div className="bg-green-500 text-white px-4 py-2 rounded-lg flex items-center space-x-2">
+                            <CheckCircle className="w-5 h-5" />
+                            <span className="font-medium">Objectif Mensuel Atteint! ({monthlyReturn.toFixed(1)}%)</span>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+                    <button 
+                      onClick={performFinancialDirectorAnalysis}
+                      disabled={isAnalyzing}
+                      className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg transition-all flex items-center space-x-2 disabled:opacity-50"
+                    >
+                    {isAnalyzing ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <span>Analyse...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="w-5 h-5" />
+                        <span>ANALYSE TEMPS RÉEL</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+                {/* Status Exécutif */}
+                {aiAnalysis && (
+                  <div className={`p-4 rounded-lg border-2 ${
+                    aiAnalysis.executiveSummary.status === 'CRITICAL' ? 'bg-red-900/50 border-red-500' :
+                    aiAnalysis.executiveSummary.status === 'DANGER' ? 'bg-orange-900/50 border-orange-500' :
+                    aiAnalysis.executiveSummary.status === 'CAUTION' ? 'bg-yellow-900/50 border-yellow-500' :
+                    'bg-green-900/50 border-green-500'
+                  }`}>
+                    <div className="flex items-center space-x-3">
+                      <span className={`w-3 h-3 rounded-full ${
+                        aiAnalysis.executiveSummary.status === 'CRITICAL' ? 'bg-red-500 animate-pulse' :
+                        aiAnalysis.executiveSummary.status === 'DANGER' ? 'bg-orange-500' :
+                        aiAnalysis.executiveSummary.status === 'CAUTION' ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`}></span>
+                      <div className="flex-1">
+                        <div className="text-lg font-bold">{aiAnalysis.executiveSummary.headline}</div>
+                        <div className="text-sm opacity-90">PRIORITÉ: {aiAnalysis.executiveSummary.priority}</div>
+                      </div>
+                      <div className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        aiAnalysis.executiveSummary.status === 'CRITICAL' ? 'bg-red-500' :
+                        aiAnalysis.executiveSummary.status === 'DANGER' ? 'bg-orange-500' :
+                        aiAnalysis.executiveSummary.status === 'CAUTION' ? 'bg-yellow-500' :
+                        'bg-green-500'
+                      }`}>
+                        {aiAnalysis.executiveSummary.status}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {aiAnalysis && (
+                <div className="space-y-6">
+                  {/* KPIs Temps Réel */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-red-500">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-slate-600">PERTE MAX AUJOURD'HUI</h3>
+                        <AlertTriangle className="w-5 h-5 text-red-500" />
+                      </div>
+                      <div className="text-2xl font-bold text-red-600">{aiAnalysis.kpis.maxLossToday}</div>
+                      <div className="text-xs text-slate-500">Limite absolue journalière</div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-slate-600">RISQUE OPTIMAL</h3>
+                        <Target className="w-5 h-5 text-blue-500" />
+                      </div>
+                      <div className="text-2xl font-bold text-blue-600">{aiAnalysis.kpis.optimalRiskPerTrade}</div>
+                      <div className="text-xs text-slate-500">Par trade recommandé</div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-slate-600">GAIN MIN REQUIS</h3>
+                        <TrendingUp className="w-5 h-5 text-green-500" />
+                      </div>
+                      <div className="text-2xl font-bold text-green-600">{aiAnalysis.kpis.minDailyGainRequired}</div>
+                      <div className="text-xs text-slate-500">Par jour pour objectif</div>
+                    </div>
+
+                    <div className={`bg-white p-6 rounded-xl shadow-sm border-l-4 ${
+                      aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'border-red-500' :
+                      aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'border-orange-500' :
+                      'border-green-500'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-slate-600">DRAWDOWN STATUS</h3>
+                        <Shield className={`w-5 h-5 ${
+                          aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-500' :
+                          aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-500' :
+                          'text-green-500'
+                        }`} />
+                      </div>
+                      <div className={`text-2xl font-bold ${
+                        aiAnalysis.kpis.drawdownStatus === 'CRITICAL' ? 'text-red-600' :
+                        aiAnalysis.kpis.drawdownStatus === 'WARNING' ? 'text-orange-600' :
+                        'text-green-600'
+                      }`}>
+                        {aiAnalysis.kpis.drawdownStatus}
+                      </div>
+                      <div className="text-xs text-slate-500">État de protection</div>
+                    </div>
+                  </div>
+
+                  {/* Apply AI Recommendations Button */}
+                  <div className="flex justify-center my-6">
+                    <button
+                      onClick={applyAiRecommendations}
+                      className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-8 py-4 rounded-xl font-medium hover:shadow-xl transition-all flex items-center space-x-3 group"
+                    >
+                      <Calculator className="w-6 h-6 group-hover:scale-110 transition-transform" />
+                      <span className="text-lg">Appliquer au Calculateur</span>
+                      <span className="text-sm opacity-80">({aiAnalysis.kpis.optimalRiskPerTrade} de risque)</span>
+                    </button>
+                  </div>
+
+                  {/* Métriques Secondaires */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <div className="text-sm font-medium text-slate-600">TRADES RESTANTS</div>
+                      <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.tradesLeftBudget}</div>
+                      <div className="text-xs text-slate-500">Dans budget risque</div>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <div className="text-sm font-medium text-slate-600">JOURS RESTANTS</div>
+                      <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.daysToTarget}</div>
+                      <div className="text-xs text-slate-500">Pour atteindre objectif</div>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <div className="text-sm font-medium text-slate-600">WIN RATE REQUIS</div>
+                      <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.winRateRequired}</div>
+                      <div className="text-xs text-slate-500">Pour réussir objectif</div>
+                    </div>
+
+                    <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+                      <div className="text-sm font-medium text-slate-600">CAPITAL À RISQUE</div>
+                      <div className="text-xl font-bold text-slate-900">{aiAnalysis.kpis.capitalAtRisk}</div>
+                      <div className="text-xs text-slate-500">Exposition totale</div>
+                    </div>
+                  </div>
+
+                  {/* Directives Financières */}
+                  <div className="bg-gradient-to-r from-indigo-50 to-blue-50 p-6 rounded-xl border border-indigo-200">
+                    <h3 className="text-lg font-semibold text-indigo-900 mb-4 flex items-center">
+                      <Cpu className="w-5 h-5 mr-2" />
+                      📋 DIRECTIVES FINANCIÈRES IMMÉDIATES
+                    </h3>
+                    <div className="grid md:grid-cols-3 gap-4">
+                      {(aiAnalysis.aiRecommendations || aiAnalysis.financialDirectives || []).map((directive, index) => (
+                        <div key={index} className="bg-white p-4 rounded-lg border border-indigo-100">
+                          <div className="flex items-start space-x-3">
+                            <div className="w-6 h-6 bg-indigo-500 text-white rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0">
+                              {index + 1}
+                            </div>
+                            <div className="text-sm text-indigo-800">{directive}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Assessment de Risque & Stratégie */}
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className={`p-6 rounded-xl border-2 ${
+                      aiAnalysis.riskAssessment.level === 'EXTREME' ? 'bg-red-50 border-red-200' :
+                      aiAnalysis.riskAssessment.level === 'HIGH' ? 'bg-orange-50 border-orange-200' :
+                      aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'bg-yellow-50 border-yellow-200' :
+                      'bg-green-50 border-green-200'
+                    }`}>
+                      <h3 className={`text-lg font-semibold mb-4 flex items-center ${
+                        aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-900' :
+                        aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-900' :
+                        aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-900' :
+                        'text-green-900'
+                      }`}>
+                        <AlertTriangle className="w-5 h-5 mr-2" />
+                        🎯 ASSESSMENT RISQUE
+                      </h3>
+                      <div className={`text-2xl font-bold mb-2 ${
+                        aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-700' :
+                        aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-700' :
+                        aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-700' :
+                        'text-green-700'
+                      }`}>
+                        {aiAnalysis.riskAssessment.level}
+                      </div>
+                      <div className={`text-sm mb-3 ${
+                        aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-800' :
+                        aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-800' :
+                        aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-800' :
+                        'text-green-800'
+                      }`}>
+                        {aiAnalysis.riskAssessment.recommendation}
+                      </div>
+                      <div className="space-y-1">
+                        {aiAnalysis.riskAssessment.factors.map((factor, index) => (
+                          <div key={index} className={`text-xs flex items-center space-x-2 ${
+                            aiAnalysis.riskAssessment.level === 'EXTREME' ? 'text-red-700' :
+                            aiAnalysis.riskAssessment.level === 'HIGH' ? 'text-orange-700' :
+                            aiAnalysis.riskAssessment.level === 'MEDIUM' ? 'text-yellow-700' :
+                            'text-green-700'
+                          }`}>
+                            <span className="w-1.5 h-1.5 bg-current rounded-full"></span>
+                            <span>{factor}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                      <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                        <LineChart className="w-5 h-5 mr-2 text-purple-600" />
+                        🎯 STRATÉGIE MARCHÉ
+                      </h3>
+                      <div className={`text-2xl font-bold mb-2 ${
+                        aiAnalysis.marketStrategy.approach === 'AGGRESSIVE' ? 'text-red-600' :
+                        aiAnalysis.marketStrategy.approach === 'BALANCED' ? 'text-blue-600' :
+                        aiAnalysis.marketStrategy.approach === 'CONSERVATIVE' ? 'text-green-600' :
+                        'text-orange-600'
+                      }`}>
+                        {aiAnalysis.marketStrategy.approach}
+                      </div>
+                      <div className="text-sm text-slate-600 mb-3">{aiAnalysis.marketStrategy.reasoning}</div>
+                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                        <div className="text-sm font-medium text-purple-900">PROCHAINE ACTION :</div>
+                        <div className="text-sm text-purple-800 mt-1">
+                          {aiAnalysis.marketStrategy.nextAction || 
+                           (aiAnalysis.marketStrategy.specificActions && aiAnalysis.marketStrategy.specificActions.join(' • '))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!aiAnalysis && (
+                <div className="text-center py-12 bg-white rounded-2xl border border-slate-200">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Brain className="w-10 h-10 text-white" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-slate-800 mb-2">Directeur Financier IA Inactif</h3>
+                  <p className="text-slate-600 mb-8 max-w-2xl mx-auto">
+                    Cliquez sur <strong>"ANALYSE TEMPS RÉEL"</strong> pour obtenir des KPIs décisionnels et des recommandations de votre directeur financier IA personnel.
+                  </p>
+                  
+                  {!aiProviderManager.getApiKey(aiProvider) && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg border border-blue-200 mb-8 max-w-2xl mx-auto">
+                      <h4 className="font-semibold text-blue-900 mb-3 flex items-center justify-center">
+                        <Lock className="w-5 h-5 mr-2" />
+                        🔑 Configuration API Recommandée
+                      </h4>
+                      <div className="text-sm text-blue-800 space-y-2">
+                        <div className="flex items-center justify-center space-x-2">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          <span>Allez dans <strong>Paramètres</strong> pour ajouter votre clé API</span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          <span>Obtenez votre clé sur <strong>console.anthropic.com</strong></span>
+                        </div>
+                        <div className="flex items-center justify-center space-x-2">
+                          <span className="w-2 h-2 bg-blue-500 rounded-full"></span>
+                          <span>Analyses illimitées avec votre propre compte</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="bg-gradient-to-r from-slate-50 to-slate-100 p-6 rounded-lg max-w-3xl mx-auto">
+                    <h4 className="font-semibold text-slate-800 mb-4">🎯 Votre Directeur Financier IA analysera :</h4>
+                    <div className="grid md:grid-cols-2 gap-4 text-sm text-slate-700">
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <DollarSign className="w-4 h-4 text-green-500" />
+                          <span>Perte maximale autorisée aujourd'hui</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Target className="w-4 h-4 text-blue-500" />
+                          <span>Risque optimal par trade</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <TrendingUp className="w-4 h-4 text-green-500" />
+                          <span>Gain minimum requis pour objectif</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-2">
+                          <Shield className="w-4 h-4 text-orange-500" />
+                          <span>État de protection drawdown</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Brain className="w-4 h-4 text-purple-500" />
+                          <span>Stratégie marché personnalisée</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <AlertTriangle className="w-4 h-4 text-red-500" />
+                          <span>Assessment de risque temps réel</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Autres onglets existants (calculator, journal, settings) restent identiques */}
+          {activeTab === 'calculator' && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-xl font-semibold text-slate-900 flex items-center">
+                    <Calculator className="w-6 h-6 mr-3 text-blue-600" />
+                    Calculateur de Position Intelligent
+                  </h2>
+                  {isUsingAiRecommendations && (
+                    <div className="flex items-center space-x-2 bg-gradient-to-r from-indigo-50 to-purple-50 px-4 py-2 rounded-lg border border-indigo-200">
+                      <Brain className="w-5 h-5 text-indigo-600" />
+                      <span className="text-sm font-medium text-indigo-700">IA Active</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Capital Trading ($)</label>
+                    <input
+                      type="number"
+                      value={capital}
+                      onChange={(e) => setCapital(e.target.value)}
+                      placeholder={(() => {
+                        const calculatedBalance = calculateCurrentBalanceFromJournal();
+                        return calculatedBalance ? calculatedBalance.toString() : currentBalance || "10000";
+                      })()}
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {(() => {
+                      const calculatedBalance = calculateCurrentBalanceFromJournal();
+                      return calculatedBalance && (
+                        <div className="text-xs text-blue-600 mt-1">Auto du Journal: ${calculatedBalance.toLocaleString()}</div>
+                      );
+                    })()}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2 flex items-center">
+                      Risque par Trade (%)
+                      {isUsingAiRecommendations && (
+                        <span className="ml-2 text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded-full">IA</span>
+                      )}
+                    </label>
+                    <input
+                      type="number"
+                      value={riskPerTrade}
+                      onChange={(e) => {
+                        setRiskPerTrade(parseFloat(e.target.value));
+                        setIsUsingAiRecommendations(false);
+                      }}
+                      step="0.1"
+                      className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        isUsingAiRecommendations ? 'border-indigo-300 bg-indigo-50' : 'border-slate-300'
+                      }`}
+                    />
+                    <div className="text-xs text-purple-600 mt-1">
+                      {isUsingAiRecommendations 
+                        ? `✨ Recommandé par l'IA pour aujourd'hui` 
+                        : recommendations && recommendations.riskAdjustment !== 1 
+                        ? `Ajusté par IA: ${recommendations.adjustedRiskPercent.toFixed(2)}%` 
+                        : 'Configuré dans Paramètres'
+                      }
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Perte Journalière Max (%)</label>
+                    <input
+                      type="number"
+                      value={dailyLossMax}
+                      step="0.1"
+                      className="w-full px-4 py-3 border border-slate-300 rounded-lg bg-slate-50"
+                      readOnly
+                    />
+                    <div className="text-xs text-slate-500 mt-1">Configuré dans Paramètres</div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Stop Loss (Ticks)</label>
+                    <input
+                      type="number"
+                      value={stopLossTicks}
+                      onChange={(e) => setStopLossTicks(e.target.value)}
+                      placeholder="20"
+                      className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <div className="text-xs text-blue-600 mt-1">1 tick = 0.25 points</div>
+                  </div>
+                </div>
+
+                {results && results.recommendations.length > 0 && (
+                  <div className="space-y-6">
+                    {/* AI Warning if exceeding recommendations */}
+                    {aiRecommendedRisk && riskPerTrade > aiRecommendedRisk && (
+                      <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg">
+                        <div className="flex items-start">
+                          <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+                          <div>
+                            <h4 className="text-red-800 font-semibold">⚠️ Risque supérieur aux recommandations IA</h4>
+                            <p className="text-red-700 text-sm mt-1">
+                              L'IA recommande un risque de {aiRecommendedRisk.toFixed(2)}% mais vous utilisez {riskPerTrade}%.
+                              Considérez réduire votre risque pour suivre les recommandations du Directeur IA.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Résumé avec alertes IA */}
+                    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-slate-900">📊 Résumé du Trade</h3>
+                        {drawdownProtection?.alert && (
+                          <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            drawdownProtection.alert.color === 'red' ? 'bg-red-500 text-white' :
+                            drawdownProtection.alert.color === 'orange' ? 'bg-orange-500 text-white' :
+                            'bg-yellow-500 text-white'
+                          }`}>
+                            {drawdownProtection.protectionLevel.toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="grid md:grid-cols-4 gap-4">
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-blue-600">${results.maxRiskPerTrade.toFixed(2)}</div>
+                          <div className="text-sm text-slate-600">Risque {results.effectiveRiskPercent !== results.originalRiskPercent ? 'Ajusté IA' : 'Standard'}</div>
+                          {results.effectiveRiskPercent !== results.originalRiskPercent && (
+                            <div className="text-xs text-purple-600">(était ${((results.capital * results.originalRiskPercent) / 100).toFixed(2)}$)</div>
+                          )}
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-purple-600">{results.stopLossTicks} ticks</div>
+                          <div className="text-sm text-slate-600">{(results.stopLossTicks * 0.25).toFixed(1)} points</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-green-600">{results.maxTradesPerDay}</div>
+                          <div className="text-sm text-slate-600">Trades Max/Jour</div>
+                        </div>
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-red-600">${results.maxDailyLoss.toFixed(2)}</div>
+                          <div className="text-sm text-slate-600">Limite Journalière</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Recommandations de positions */}
+                    <div className="space-y-4">
+                      {results.recommendations.map((rec, index) => (
+                        <div key={rec.symbol} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold text-slate-900">{rec.contract.name}</h3>
+                              <p className="text-slate-600">{rec.contract.description}</p>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-3xl font-bold text-blue-600">{rec.recommendedContracts}</div>
+                              <div className="text-sm text-slate-500">contrats</div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid md:grid-cols-5 gap-4 text-sm">
+                            <div className="bg-slate-50 p-3 rounded-lg">
+                              <div className="font-medium text-slate-700">Risque Total</div>
+                              <div className="text-lg font-bold text-red-600">${rec.totalRisk.toFixed(2)}</div>
+                              <div className="text-slate-500">{rec.riskPercent.toFixed(2)}%</div>
+                            </div>
+                            <div className="bg-slate-50 p-3 rounded-lg">
+                              <div className="font-medium text-slate-700">Marge</div>
+                              <div className="text-lg font-bold text-gray-900">${rec.totalMargin.toLocaleString()}</div>
+                              <div className="text-slate-500">{rec.marginPercent.toFixed(1)}%</div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                              <div className="font-medium text-slate-700">Gain 1:1</div>
+                              <div className="text-lg font-bold text-green-600">+${rec.potential1to1.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                              <div className="font-medium text-slate-700">Gain 1:2</div>
+                              <div className="text-lg font-bold text-green-600">+${rec.potential1to2.toFixed(2)}</div>
+                            </div>
+                            <div className="bg-green-50 p-3 rounded-lg">
+                              <div className="font-medium text-slate-700">Gain 1:3</div>
+                              <div className="text-lg font-bold text-green-600">+${rec.potential1to3.toFixed(2)}</div>
+                            </div>
+                          </div>
+
+                          {index === 0 && (
+                            <div className={`mt-4 p-3 rounded-lg border ${
+                              drawdownProtection?.protectionLevel === 'emergency' ? 'bg-red-50 border-red-200' :
+                              drawdownProtection?.protectionLevel === 'danger' ? 'bg-orange-50 border-orange-200' :
+                              'bg-green-50 border-green-200'
+                            }`}>
+                              <div className="flex items-center">
+                                {drawdownProtection?.protectionLevel === 'emergency' ? 
+                                  <Skull className="w-4 h-4 text-red-600 mr-2" /> :
+                                  <CheckCircle className="w-4 h-4 text-green-600 mr-2" />
+                                }
+                                <span className={`text-sm font-medium ${
+                                  drawdownProtection?.protectionLevel === 'emergency' ? 'text-red-800' :
+                                  drawdownProtection?.protectionLevel === 'danger' ? 'text-orange-800' :
+                                  'text-green-800'
+                                }`}>
+                                  {drawdownProtection?.protectionLevel === 'emergency' ? '🚨 URGENCE:' :
+                                   drawdownProtection?.protectionLevel === 'danger' ? '⚠️ ATTENTION:' : '✅ RECOMMANDÉ:'}
+                                  {' '}{rec.recommendedContracts} × {rec.symbol} | SL: {results.stopLossTicks} ticks | Risque: ${rec.totalRisk.toFixed(2)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'journal' && (
+            <div className="space-y-6">
+              {/* Header du Journal */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-semibold text-slate-900 flex items-center">
+                      <Calendar className="w-6 h-6 mr-3 text-green-600" />
+                      Journal de Trading Intelligent
+                    </h2>
+                    <p className="text-slate-600">Enregistrez vos performances - L'IA analysera vos patterns</p>
+                  </div>
+                  
+                  {/* Stats rapides avec nouvelles métriques */}
+                  {(() => {
+                    const stats = getJournalStats();
+                    return (
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div className="bg-green-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-green-600">{stats.winRate.toFixed(1)}%</div>
+                          <div className="text-xs text-green-700">Win Rate</div>
+                        </div>
+                        <div className="bg-blue-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-blue-600">{stats.totalTrades}</div>
+                          <div className="text-xs text-blue-700">Trades</div>
+                        </div>
+                        <div className="bg-purple-50 p-3 rounded-lg">
+                          <div className="text-lg font-bold text-purple-600">{stats.profitFactor.toFixed(2)}</div>
+                          <div className="text-xs text-purple-700">Profit Factor</div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Alerte pattern si nécessaire */}
+                {(() => {
+                  const stats = getJournalStats();
+                  return stats.consecutiveLosses >= 2 && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <div className="flex items-center">
+                        <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+                        <span className="font-medium text-red-800">
+                          ⚠️ Pattern d'échec détecté: {stats.consecutiveLosses} pertes consécutives
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Calendrier */}
+                {(() => {
+                  const today = new Date();
+                  const currentMonth = today.getMonth();
+                  const currentYear = today.getFullYear();
+                  const daysInMonth = getDaysInMonth(today);
+                  const firstDayOfMonth = getFirstDayOfMonth(today);
+                  const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
+                  const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
+
+                  return (
+                    <div>
+                      {/* Header du calendrier */}
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-semibold text-slate-800">
+                          {monthNames[currentMonth]} {currentYear}
+                        </h3>
+                        <div className="flex items-center space-x-4 text-sm">
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 bg-green-500 rounded"></div>
+                            <span className="text-slate-600">Gain</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 bg-red-500 rounded"></div>
+                            <span className="text-slate-600">Perte</span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <div className="w-3 h-3 bg-slate-300 rounded"></div>
+                            <span className="text-slate-600">No Trade</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Grille du calendrier */}
+                      <div className="grid grid-cols-7 gap-2">
+                        {/* Noms des jours */}
+                        {dayNames.map(day => (
+                          <div key={day} className="text-center text-sm font-medium text-slate-500 p-2">
+                            {day}
+                          </div>
+                        ))}
+                        
+                        {/* Cases vides pour les jours précédents */}
+                        {Array.from({ length: firstDayOfMonth - 1 }, (_, i) => (
+                          <div key={`empty-${i}`} className="p-2"></div>
+                        ))}
+                        
+                        {/* Jours du mois */}
+                        {Array.from({ length: daysInMonth }, (_, i) => {
+                          const day = i + 1;
+                          const dateKey = getDateKey(currentYear, currentMonth, day);
+                          const status = getDayStatus(dateKey);
+                          const isToday = day === today.getDate();
+                          const dayData = tradingJournal[dateKey];
+                          
+                          const getStatusStyles = () => {
+                            switch (status) {
+                              case 'profit':
+                                return 'bg-green-500 text-white hover:bg-green-600';
+                              case 'loss':
+                                return 'bg-red-500 text-white hover:bg-red-600';
+                              case 'no-trade':
+                                return 'bg-slate-300 text-slate-700 hover:bg-slate-400';
+                              case 'breakeven':
+                                return 'bg-yellow-500 text-white hover:bg-yellow-600';
+                              default:
+                                return 'bg-slate-100 text-slate-700 hover:bg-slate-200';
+                            }
+                          };
+
+                          return (
+                            <button
+                              key={day}
+                              onClick={() => handleDayClick(currentYear, currentMonth, day)}
+                              className={`p-3 rounded-lg text-sm font-medium transition-all hover:shadow-md ${getStatusStyles()} ${
+                                isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''
+                              }`}
+                            >
+                              <div className="text-center">
+                                <div className="font-bold">{day}</div>
+                                {dayData && dayData.hasTraded && (
+                                  <div className="text-xs mt-1">
+                                    {parseFloat(dayData.pnl) > 0 ? '+' : ''}
+                                    {parseFloat(dayData.pnl) ? `${parseFloat(dayData.pnl).toFixed(0)}` : '$0'}
+                                  </div>
+                                )}
+                                {dayData && !dayData.hasTraded && (
+                                  <div className="text-xs mt-1">-</div>
+                                )}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Stats détaillées avec nouvelles métriques */}
+              {(() => {
+                const stats = getJournalStats();
+                return (
+                  <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
+                      <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
+                      Statistiques Avancées
+                    </h3>
+                    
+                    <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-green-50 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-green-600">
+                          ${stats.totalPnL >= 0 ? '+' : ''}{stats.totalPnL.toFixed(2)}
+                        </div>
+                        <div className="text-sm text-green-700">P&L Total</div>
+                      </div>
+                      
+                      <div className="bg-blue-50 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-blue-600">{stats.winRate.toFixed(2)}%</div>
+                        <div className="text-sm text-blue-700">Win Rate</div>
+                        <div className="text-xs text-blue-600">{stats.winningTrades}W / {stats.losingTrades}L</div>
+                      </div>
+                      
+                      <div className="bg-purple-50 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-purple-600">${stats.avgWin.toFixed(2)}</div>
+                        <div className="text-sm text-purple-700">Gain Moyen</div>
+                      </div>
+                      
+                      <div className="bg-orange-50 p-4 rounded-lg">
+                        <div className="text-2xl font-bold text-orange-600">${stats.avgLoss.toFixed(2)}</div>
+                        <div className="text-sm text-orange-700">Perte Moyenne</div>
+                      </div>
+                    </div>
+
+                    {/* Nouvelles métriques IA */}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div className={`p-4 rounded-lg ${stats.consecutiveLosses >= 3 ? 'bg-red-50 border border-red-200' : 'bg-slate-50'}`}>
+                        <div className="text-lg font-bold text-slate-900">{stats.consecutiveLosses}</div>
+                        <div className="text-sm text-slate-700">Pertes Consécutives</div>
+                        {stats.consecutiveLosses >= 3 && (
+                          <div className="text-xs text-red-600 mt-1">⚠️ Pattern risqué</div>
+                        )}
+                      </div>
+                      
+                      <div className={`p-4 rounded-lg ${stats.profitFactor >= 2 ? 'bg-green-50' : stats.profitFactor >= 1 ? 'bg-yellow-50' : 'bg-red-50'}`}>
+                        <div className="text-lg font-bold text-slate-900">{stats.profitFactor.toFixed(2)}</div>
+                        <div className="text-sm text-slate-700">Profit Factor</div>
+                        <div className="text-xs text-slate-600 mt-1">
+                          {stats.profitFactor >= 2 ? '✅ Excellent' : stats.profitFactor >= 1 ? '🔶 Correct' : '⚠️ Améliorer'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {activeTab === 'settings' && (
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center">
+                  <Settings className="w-6 h-6 mr-3 text-purple-600" />
+                  Configuration Trading IA
+                </h2>
+                
+                <div className="grid md:grid-cols-2 gap-8">
+                  {/* Capital & Performance */}
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-200 pb-2">
+                      💰 Capital & Performance
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Capital Initial ($)</label>
+                        <input
+                          type="number"
+                          value={initialCapital}
+                          onChange={(e) => setInitialCapital(e.target.value)}
+                          placeholder="48518.30"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-slate-500 mt-1">Capital de départ pour calculs de performance et drawdown</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Capital Actuel ($)</label>
+                        <input
+                          type="number"
+                          value={currentBalance}
+                          onChange={(e) => setCurrentBalance(e.target.value)}
+                          placeholder="51628.12"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-purple-600 mt-1">⚡ Base pour TOUS les calculs de risque (compound)</div>
+                        {calculateCurrentBalanceFromJournal() && (
+                          <div className="text-xs text-green-600 mt-1">📅 Auto-calculé du journal: ${calculateCurrentBalanceFromJournal().toLocaleString()}</div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Objectif Hebdomadaire (%)</label>
+                        <input
+                          type="number"
+                          value={weeklyTarget}
+                          onChange={(e) => setWeeklyTarget(parseFloat(e.target.value))}
+                          step="0.5"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-blue-600 mt-1">📅 Se réinitialise chaque lundi</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Objectif Mensuel (%)</label>
+                        <input
+                          type="number"
+                          value={monthlyTarget}
+                          onChange={(e) => setMonthlyTarget(parseFloat(e.target.value))}
+                          step="0.5"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-green-600 mt-1">🎯 Objectif principal - L'IA optimise pour l'atteindre</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Money Management IA */}
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-semibold text-slate-800 border-b border-slate-200 pb-2">
+                      🧠 Money Management IA
+                    </h3>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Risque par Trade (%)</label>
+                        <input
+                          type="number"
+                          value={riskPerTrade}
+                          onChange={(e) => setRiskPerTrade(parseFloat(e.target.value))}
+                          step="0.1"
+                          min="0.1"
+                          max="10"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-slate-500 mt-1">L'IA ajustera automatiquement selon les conditions</div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-2">Perte Max Journalière (%)</label>
+                        <input
+                          type="number"
+                          value={dailyLossMax}
+                          onChange={(e) => setDailyLossMax(parseFloat(e.target.value))}
+                          step="0.1"
+                          min="1"
+                          max="20"
+                          className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <div className="text-xs text-red-600 mt-1">🚨 Limite absolue - Recommandé: 1-2% maximum</div>
+                      </div>
+                      
+                      {/* Nouveaux seuils de protection */}
+                      <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="font-medium text-blue-900 mb-3">🛡️ Protection Drawdown Automatique</h4>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div className="text-blue-800">
+                            <span className="font-medium">Seuil 1:</span> 1.5% → Risque -20%
+                          </div>
+                          <div className="text-blue-800">
+                            <span className="font-medium">Seuil 2:</span> 3% → Risque -40%
+                          </div>
+                          <div className="text-orange-800">
+                            <span className="font-medium">Seuil 3:</span> 5% → Risque -70%
+                          </div>
+                          <div className="text-red-800">
+                            <span className="font-medium">Seuil 4:</span> 8% → MODE SURVIE
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* AI Provider Selection */}
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Fournisseur IA</label>
+                          <select
+                            value={aiProvider}
+                            onChange={(e) => {
+                              setAiProvider(e.target.value);
+                              aiProviderManager.setCurrentProvider(e.target.value.toUpperCase());
+                            }}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="anthropic">Anthropic (Claude)</option>
+                            <option value="openai">OpenAI (ChatGPT)</option>
+                            <option value="google">Google (Gemini)</option>
+                          </select>
+                        </div>
+
+                        {/* Model Selection */}
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">Modèle</label>
+                          <select
+                            value={selectedModel[aiProvider] || ''}
+                            onChange={(e) => setSelectedModel({ ...selectedModel, [aiProvider]: e.target.value })}
+                            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            {aiProviderManager.getModelsForProvider(aiProvider.toUpperCase()).map(model => (
+                              <option key={model.id} value={model.id}>{model.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Anthropic API Key */}
+                        {aiProvider === 'anthropic' && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Clé API Anthropic</label>
+                            <input
+                              type="password"
+                              value={anthropicApiKey}
+                              onChange={(e) => {
+                                setAnthropicApiKey(e.target.value);
+                                aiProviderManager.setApiKey('anthropic', e.target.value);
+                              }}
+                              placeholder="sk-ant-api03-..."
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                            <div className="text-xs text-slate-500 mt-1">
+                              Obtenez votre clé sur console.anthropic.com
+                            </div>
+                          </div>
+                        )}
+
+                        {/* OpenAI API Key */}
+                        {aiProvider === 'openai' && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Clé API OpenAI</label>
+                            <input
+                              type="password"
+                              value={openAiApiKey}
+                              onChange={(e) => {
+                                setOpenAiApiKey(e.target.value);
+                                aiProviderManager.setApiKey('openai', e.target.value);
+                              }}
+                              placeholder="sk-..."
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                            <div className="text-xs text-slate-500 mt-1">
+                              Obtenez votre clé sur platform.openai.com
+                            </div>
+                            <div className="text-xs text-amber-600 mt-1">
+                              ⚠️ Note: GPT-4 nécessite un accès payant. Utilisez GPT-3.5 Turbo si vous n'avez pas accès à GPT-4.
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Google API Key */}
+                        {aiProvider === 'google' && (
+                          <div>
+                            <label className="block text-sm font-medium text-slate-700 mb-2">Clé API Google</label>
+                            <input
+                              type="password"
+                              value={googleApiKey}
+                              onChange={(e) => {
+                                setGoogleApiKey(e.target.value);
+                                aiProviderManager.setApiKey('google', e.target.value);
+                              }}
+                              placeholder="AIza..."
+                              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                            <div className="text-xs text-slate-500 mt-1">
+                              Obtenez votre clé sur makersuite.google.com
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <div className="text-sm text-blue-800">
+                            <span className="font-medium">💡 Conseil:</span> Chaque fournisseur a ses avantages:
+                            <ul className="mt-1 ml-4 text-xs">
+                              <li>• <strong>Claude:</strong> Excellent pour l'analyse financière</li>
+                              <li>• <strong>GPT-4:</strong> Polyvalent et créatif</li>
+                              <li>• <strong>Gemini:</strong> Rapide et économique</li>
+                            </ul>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Mode Sécurisé */}
+                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-orange-900">Mode Sécurisé</h4>
+                            <p className="text-sm text-orange-700">Réduit automatiquement tous les risques de 50%</p>
+                          </div>
+                          <button
+                            onClick={() => setSecureMode(!secureMode)}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                              secureMode
+                                ? 'bg-orange-500 text-white'
+                                : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                            }`}
+                          >
+                            {secureMode ? 'Activé' : 'Désactivé'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Système IA - Nouveau */}
+                <div className="mt-8 pt-6 border-t border-slate-200">
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 border border-purple-200 rounded-lg p-6 mb-6">
+                    <h4 className="font-semibold text-purple-900 mb-4 flex items-center">
+                      <Brain className="w-5 h-5 mr-2" />
+                      🤖 Système IA Méthode Alpha
+                    </h4>
+                    <ul className="text-sm text-purple-800 space-y-2">
+                      <li>• <strong>Protection Drawdown:</strong> Surveillance continue du pic mensuel</li>
+                      <li>• <strong>Analyse Patterns:</strong> Détection automatique des séries de pertes</li>
+                      <li>• <strong>Risque Adaptatif:</strong> Ajustement en temps réel selon performance</li>
+                      <li>• <strong>Objectif Prioritaire:</strong> Optimisation pour finir le mois POSITIF</li>
+                      <li>• <strong>Mode Survie:</strong> Activation automatique en cas de drawdown critique</li>
+                    </ul>
+                  </div>
+
+                  <button className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-3 rounded-lg font-medium hover:shadow-lg transition-all flex items-center space-x-2">
+                    <CheckCircle className="w-5 h-5" />
+                    <span>Sauvegarder Configuration IA</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Data Management Section */}
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 className="text-xl font-semibold text-slate-900 mb-6 flex items-center">
+                  <Save className="w-6 h-6 mr-3 text-green-600" />
+                  Gestion des Données
+                </h2>
+                
+                <div className="space-y-6">
+                  <div className="bg-blue-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-2">
+                      💾 Sauvegarde Automatique Activée
+                    </h3>
+                    <p className="text-sm text-blue-700">
+                      Toutes vos données sont automatiquement sauvegardées localement. 
+                      Elles persisteront même après un rafraîchissement de la page.
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <button
+                      onClick={() => {
+                        dataManager.downloadBackup();
+                        alert('Backup téléchargé avec succès!');
+                      }}
+                      className="bg-green-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-green-700 transition-all flex items-center justify-center space-x-2"
+                    >
+                      <Download className="w-5 h-5" />
+                      <span>Télécharger Backup</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.json';
+                        input.onchange = (e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              try {
+                                const data = JSON.parse(event.target.result);
+                                dataManager.importData(data);
+                                alert('Données restaurées avec succès! Rechargez la page.');
+                                window.location.reload();
+                              } catch (error) {
+                                alert('Erreur lors de l\'importation des données.');
+                              }
+                            };
+                            reader.readAsText(file);
+                          }
+                        };
+                        input.click();
+                      }}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-all flex items-center justify-center space-x-2"
+                    >
+                      <Upload className="w-5 h-5" />
+                      <span>Restaurer Backup</span>
+                    </button>
+                  </div>
+
+                  <div className="border-t pt-4">
+                    <button
+                      onClick={() => {
+                        if (confirm('Êtes-vous sûr de vouloir supprimer toutes les données ? Cette action est irréversible.')) {
+                          dataManager.clearAllData();
+                          alert('Toutes les données ont été supprimées.');
+                          window.location.reload();
+                        }
+                      }}
+                      className="bg-red-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-red-700 transition-all flex items-center space-x-2"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span>Effacer Toutes les Données</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-yellow-50 p-4 rounded-lg">
+                    <h3 className="text-sm font-semibold text-yellow-900 mb-2">
+                      🔄 Migration Future vers Supabase
+                    </h3>
+                    <p className="text-sm text-yellow-700">
+                      Les données sont structurées pour faciliter la migration vers Supabase. 
+                      Utilisez régulièrement la fonction de backup pour conserver vos données en sécurité.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      
+      {/* Modal pour saisir les données journalières - IDENTIQUE */}
+      {showDayModal && selectedDate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-semibold text-slate-900">
+                {selectedDate.day} {["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"][selectedDate.month]} {selectedDate.year}
+              </h3>
+              <button
+                onClick={() => setShowDayModal(false)}
+                className="text-slate-500 hover:text-slate-700"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-center space-x-3">
+                <input
+                  type="checkbox"
+                  id="hasTraded"
+                  checked={dayData.hasTraded}
+                  onChange={(e) => setDayData(prev => ({ ...prev, hasTraded: e.target.checked }))}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="hasTraded" className="text-sm font-medium text-slate-700">
+                  J'ai tradé ce jour-là
+                </label>
+              </div>
+
+              {dayData.hasTraded && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    P&L du jour ($)
+                  </label>
+                  <input
+                    type="number"
+                    value={dayData.pnl}
+                    onChange={(e) => setDayData(prev => ({ ...prev, pnl: e.target.value }))}
+                    placeholder="Ex: +150.50 ou -75.25"
+                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <div className="text-xs text-slate-500 mt-1">
+                    L'IA analysera ce trade pour détecter des patterns
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Notes (optionnel)
+                </label>
+                <textarea
+                  value={dayData.notes}
+                  onChange={(e) => setDayData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Stratégie, marché, état psychologique..."
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows="3"
+                />
+              </div>
+
+              <div className="flex space-x-3 pt-4">
+                <button
+                  onClick={() => setShowDayModal(false)}
+                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={saveDayData}
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg font-medium"
+                >
+                  Sauvegarder
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      </div>
+    </div>
+  );
+};
+
+export default MethodeAlpha;
