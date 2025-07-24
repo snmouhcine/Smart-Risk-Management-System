@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Brain, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { AI_MODELS, testAPIConnection } from '../../utils/aiProviders';
+import { parseNumberInput } from '../../utils/formatters';
 
 const SettingsModule = ({
   initialCapital,
@@ -72,9 +73,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Capital Initial ($)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={initialCapital}
-                  onChange={(e) => setInitialCapital(e.target.value)}
+                  onChange={(e) => setInitialCapital(parseNumberInput(e.target.value, 2))}
                   placeholder="48518.30"
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
@@ -83,9 +84,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Capital Actuel ($)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={currentBalance}
-                  onChange={(e) => setCurrentBalance(e.target.value)}
+                  onChange={(e) => setCurrentBalance(parseNumberInput(e.target.value, 2))}
                   placeholder="51628.12"
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
@@ -97,10 +98,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Objectif Hebdomadaire (%)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={weeklyTarget}
-                  onChange={(e) => setWeeklyTarget(parseFloat(e.target.value))}
-                  step="0.5"
+                  onChange={(e) => setWeeklyTarget(parseFloat(parseNumberInput(e.target.value, 2)) || 0)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <div className="text-xs text-blue-600 mt-1">📅 Se réinitialise chaque lundi</div>
@@ -108,10 +108,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Objectif Mensuel (%)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={monthlyTarget}
-                  onChange={(e) => setMonthlyTarget(parseFloat(e.target.value))}
-                  step="0.5"
+                  onChange={(e) => setMonthlyTarget(parseFloat(parseNumberInput(e.target.value, 2)) || 0)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <div className="text-xs text-green-600 mt-1">🎯 Objectif principal - L'IA optimise pour l'atteindre</div>
@@ -128,12 +127,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Risque par Trade (%)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={riskPerTrade}
-                  onChange={(e) => setRiskPerTrade(parseFloat(e.target.value))}
-                  step="0.1"
-                  min="0.1"
-                  max="10"
+                  onChange={(e) => setRiskPerTrade(parseFloat(parseNumberInput(e.target.value, 2)) || 0)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <div className="text-xs text-slate-500 mt-1">L'IA ajustera automatiquement selon les conditions</div>
@@ -141,12 +137,9 @@ const SettingsModule = ({
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Perte Max Journalière (%)</label>
                 <input
-                  type="number"
+                  type="text"
                   value={dailyLossMax}
-                  onChange={(e) => setDailyLossMax(parseFloat(e.target.value))}
-                  step="0.1"
-                  min="1"
-                  max="20"
+                  onChange={(e) => setDailyLossMax(parseFloat(parseNumberInput(e.target.value, 2)) || 0)}
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <div className="text-xs text-red-600 mt-1">🚨 Limite absolue - Recommandé: 1-2% maximum</div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calendar, AlertTriangle, BarChart3, X } from 'lucide-react';
+import { formatCurrency, formatNumber, parseNumberInput } from '../../utils/formatters';
 
 const Journal = ({
   tradingJournal,
@@ -243,10 +244,10 @@ const Journal = ({
                     P&L du jour ($)
                   </label>
                   <input
-                    type="number"
+                    type="text"
                     value={dayData.pnl}
-                    onChange={(e) => setDayData(prev => ({ ...prev, pnl: e.target.value }))}
-                    placeholder="Ex: +150.50 ou -75.25"
+                    onChange={(e) => setDayData(prev => ({ ...prev, pnl: parseNumberInput(e.target.value, 2) }))}
+                    placeholder="Ex: 150.50 ou -75.25"
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <div className="text-xs text-slate-500 mt-1">

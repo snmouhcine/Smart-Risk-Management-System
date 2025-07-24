@@ -42,3 +42,8 @@ api/anthropic-proxy.js
 # OS files
 .DS_Store
 Thumbs.db
+
+# Supabase
+.env.local
+.env
+*.env

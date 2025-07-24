@@ -4,6 +4,7 @@ import {
   Brain, Calculator, Lock, Skull, Flame, AlertCircle,
   LineChart, Cpu, Activity
 } from 'lucide-react';
+import { formatCurrency, formatPercentage, calculateMonthlyTargetAmount, calculateWeeklyTargetAmount } from '../../utils/formatters';
 
 const Dashboard = ({ 
   calculateCurrentBalanceFromJournal,
@@ -11,11 +12,19 @@ const Dashboard = ({
   recommendations,
   drawdownProtection,
   monthlyTarget,
+  weeklyTarget,
+  initialCapital,
+  tradingJournal,
   handleQuickAction,
   isAnalyzing,
   secureMode,
   getStatusStyles
 }) => {
+  // Calculs des objectifs
+  const calculatedBalance = calculateCurrentBalanceFromJournal();
+  const actualBalance = calculatedBalance || parseFloat(currentBalance) || 0;
+  const monthlyTargetInfo = calculateMonthlyTargetAmount(actualBalance, initialCapital, monthlyTarget);
+  const weeklyTargetInfo = calculateWeeklyTargetAmount(tradingJournal, actualBalance, weeklyTarget);
   return (
     <div className="space-y-6">
       {/* NOUVELLE Alerte de Protection Drawdown */}
@@ -176,6 +185,140 @@ const Dashboard = ({
              drawdownProtection?.protectionLevel === 'danger' ? 'PROTECTION' : 
              'Par Trade'}
           </p>
+        </div>
+      </div>
+
+      {/* Section Objectifs avec montants en $ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Objectif Mensuel */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-2xl border border-blue-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center">
+                <Target className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Objectif Mensuel</h3>
+                <p className="text-sm text-slate-600">{formatPercentage(monthlyTarget)} visé</p>
+              </div>
+            </div>
+            {monthlyTargetInfo.isAchieved && (
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">Objectif</span>
+              <span className="text-lg font-bold text-blue-600">{formatCurrency(monthlyTargetInfo.targetAmount)}</span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">Actuel</span>
+              <span className="text-lg font-bold text-slate-900">{formatCurrency(actualBalance)}</span>
+            </div>
+
+            {!monthlyTargetInfo.isAchieved ? (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-700">Restant</span>
+                <span className="text-xl font-bold text-orange-600">{formatCurrency(monthlyTargetInfo.remainingAmount)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-700">Dépassement</span>
+                <span className="text-xl font-bold text-green-600">+{formatCurrency(actualBalance - monthlyTargetInfo.targetAmount)}</span>
+              </div>
+            )}
+
+            {/* Barre de progression */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-slate-600 mb-1">
+                <span>Progression</span>
+                <span>{Math.min(100, monthlyTargetInfo.currentProgress).toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    monthlyTargetInfo.isAchieved ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 
+                    monthlyTargetInfo.currentProgress >= 75 ? 'bg-gradient-to-r from-blue-500 to-indigo-600' : 
+                    'bg-gradient-to-r from-blue-400 to-blue-500'
+                  }`}
+                  style={{ width: `${Math.min(100, monthlyTargetInfo.currentProgress)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Objectif Hebdomadaire */}
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-2xl border border-green-200">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Objectif Hebdomadaire</h3>
+                <p className="text-sm text-slate-600">{formatPercentage(weeklyTarget)} visé • Jour {weeklyTargetInfo.daysFromMonday}/7</p>
+              </div>
+            </div>
+            {weeklyTargetInfo.isAchieved && (
+              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">Capital début semaine</span>
+              <span className="text-lg font-bold text-slate-600">{formatCurrency(weeklyTargetInfo.weekStartBalance)}</span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">Objectif semaine</span>
+              <span className="text-lg font-bold text-green-600">{formatCurrency(weeklyTargetInfo.targetAmount)}</span>
+            </div>
+
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-slate-700">P&L semaine</span>
+              <span className={`text-lg font-bold ${weeklyTargetInfo.currentWeeklyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {weeklyTargetInfo.currentWeeklyPnL >= 0 ? '+' : ''}{formatCurrency(weeklyTargetInfo.currentWeeklyPnL)}
+              </span>
+            </div>
+
+            {!weeklyTargetInfo.isAchieved ? (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-700">Restant à gagner</span>
+                <span className="text-xl font-bold text-orange-600">{formatCurrency(weeklyTargetInfo.remainingAmount)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-700">Dépassement</span>
+                <span className="text-xl font-bold text-green-600">+{formatCurrency(weeklyTargetInfo.currentWeeklyPnL - weeklyTargetInfo.targetAmount)}</span>
+              </div>
+            )}
+
+            {/* Barre de progression */}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs text-slate-600 mb-1">
+                <span>Progression</span>
+                <span>{Math.min(100, weeklyTargetInfo.currentProgress).toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-slate-200 rounded-full h-2">
+                <div 
+                  className={`h-2 rounded-full transition-all duration-500 ${
+                    weeklyTargetInfo.isAchieved ? 'bg-gradient-to-r from-green-500 to-emerald-600' : 
+                    weeklyTargetInfo.currentProgress >= 75 ? 'bg-gradient-to-r from-green-500 to-green-600' : 
+                    'bg-gradient-to-r from-green-400 to-green-500'
+                  }`}
+                  style={{ width: `${Math.min(100, weeklyTargetInfo.currentProgress)}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

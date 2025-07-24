@@ -1,7 +1,16 @@
-import MethodeAlpha from './components/MethodeAlpha';
+import React from 'react'
+import { AuthProvider } from './contexts/AuthContext'
+import AuthGuard from './components/auth/AuthGuard'
+import MethodeAlpha from './components/MethodeAlpha'
 
 function App() {
-  return <MethodeAlpha />;
+  return (
+    <AuthProvider>
+      <AuthGuard>
+        <MethodeAlpha />
+      </AuthGuard>
+    </AuthProvider>
+  )
 }
 
-export default App;
+export default App

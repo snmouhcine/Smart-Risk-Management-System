@@ -3,10 +3,10 @@ import {
   Calculator, TrendingUp, AlertTriangle, DollarSign, Target, 
   TrendingDown, Calendar, Brain, Shield, BarChart3, PieChart,
   Settings, Bell, User, Menu, X, Activity, Zap, Eye, Lock, CheckCircle, AlertCircle,
-  Cpu, Bot, LineChart, Flame, Skull
+  Cpu, Bot, LineChart, Flame, Skull, LogOut, Loader2
 } from 'lucide-react';
-
-import { useLocalStorage } from '../hooks/useLocalStorage';
+import { useAuth } from '../contexts/AuthContext';
+import { useSupabaseData } from '../hooks/useSupabaseData';
 import { callAIAPI } from '../utils/aiProviders';
 
 // Import des modules
@@ -17,7 +17,22 @@ import DirecteurIA from './modules/DirecteurIA';
 import SettingsModule from './modules/Settings';
 
 const MethodeAlpha = () => {
-  // États existants
+  const { user, signOut } = useAuth();
+  const { 
+    loading: dataLoading, 
+    userSettings, 
+    tradingJournal, 
+    saveSettings, 
+    saveJournalEntry,
+    saveAIAnalysis,
+    isDataLoaded 
+  } = useSupabaseData();
+
+  // États locaux pour l'interface
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  
+  // États dérivés des userSettings (avec fallbacks)
   const [capital, setCapital] = useState('');
   const [riskPerTrade, setRiskPerTrade] = useState(1);
   const [dailyLossMax, setDailyLossMax] = useState(3);
@@ -29,36 +44,123 @@ const MethodeAlpha = () => {
   const [currentBalance, setCurrentBalance] = useState('');
   const [weeklyTarget, setWeeklyTarget] = useState(2);
   const [monthlyTarget, setMonthlyTarget] = useState(8);
-  const [recommendations, setRecommendations] = useState(null);
 
-  // États UI
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // États spécifiques
+  const [recommendations, setRecommendations] = useState('');
   const [secureMode, setSecureMode] = useState(false);
 
-  // États Journal de Trading
-  const [tradingJournal, setTradingJournal] = useState({});
+  // États pour le journal
   const [showDayModal, setShowDayModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(null);
   const [dayData, setDayData] = useState({ pnl: '', notes: '', hasTraded: true });
 
-  // NOUVEAUX États pour IA et Protection
-  const [aiAnalysis, setAiAnalysis] = useState(null);
+  // États pour l'IA
+  const [aiAnalysis, setAiAnalysis] = useState('');
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [drawdownProtection, setDrawdownProtection] = useState(null);
   const [monthlyPeak, setMonthlyPeak] = useState(0);
   const [emergencyMode, setEmergencyMode] = useState(false);
-  const [anthropicApiKey, setAnthropicApiKey] = useLocalStorage('anthropicApiKey', '');
-  
-  // NOUVEAU : États pour multi-modèles IA
-  const [aiProvider, setAiProvider] = useLocalStorage('aiProvider', 'anthropic');
-  const [openaiApiKey, setOpenaiApiKey] = useLocalStorage('openaiApiKey', '');
-  const [selectedModel, setSelectedModel] = useLocalStorage('selectedModel', 'claude-3-5-sonnet-20241022');
-  
-  // NOUVEAU : État pour les recommandations IA qui seront utilisées par le calculateur
+
+  // États pour les clés API et modèles
+  const [aiProvider, setAiProvider] = useState('anthropic');
+  const [openaiApiKey, setOpenaiApiKey] = useState('');
+  const [anthropicApiKey, setAnthropicApiKey] = useState('');
+  const [selectedModel, setSelectedModel] = useState('claude-3-5-sonnet-20241022');
+
+  // États pour l'IA recommandée
   const [aiRecommendedRisk, setAiRecommendedRisk] = useState(null);
   const [aiMaxDailyLoss, setAiMaxDailyLoss] = useState(null);
 
+  // Synchroniser les états avec userSettings
+  useEffect(() => {
+    if (userSettings) {
+      setInitialCapital(userSettings.initial_capital?.toString() || '');
+      setCurrentBalance(userSettings.current_balance?.toString() || '');
+      setRiskPerTrade(userSettings.risk_per_trade || 1);
+      setDailyLossMax(userSettings.daily_loss_max || 3);
+      setWeeklyTarget(userSettings.weekly_target || 2);
+      setMonthlyTarget(userSettings.monthly_target || 8);
+      setSecureMode(userSettings.secure_mode || false);
+      setAiProvider(userSettings.ai_provider || 'anthropic');
+      setSelectedModel(userSettings.selected_model || 'claude-3-5-sonnet-20241022');
+      setAnthropicApiKey(userSettings.anthropic_api_key || '');
+      setOpenaiApiKey(userSettings.openai_api_key || '');
+      
+      // Synchroniser le capital avec current_balance si pas défini
+      if (!capital && userSettings.current_balance) {
+        setCapital(userSettings.current_balance.toString());
+      }
+    }
+  }, [userSettings, capital]);
+
+
+
+  // Fonction pour sauvegarder les paramètres
+  const saveUserSettings = async (newSettings) => {
+    try {
+      await saveSettings(newSettings);
+    } catch (error) {
+      console.error('Erreur sauvegarde paramètres:', error);
+    }
+  };
+
+  // Fonctions wrapped pour auto-sauvegarde
+  const setInitialCapitalWithSave = (value) => {
+    setInitialCapital(value);
+    saveUserSettings({ initial_capital: parseFloat(value) || 0 });
+  };
+
+  const setCurrentBalanceWithSave = (value) => {
+    setCurrentBalance(value);
+    saveUserSettings({ current_balance: parseFloat(value) || 0 });
+  };
+
+  const setRiskPerTradeWithSave = (value) => {
+    setRiskPerTrade(value);
+    saveUserSettings({ risk_per_trade: value });
+  };
+
+  const setDailyLossMaxWithSave = (value) => {
+    setDailyLossMax(value);
+    saveUserSettings({ daily_loss_max: value });
+  };
+
+  const setWeeklyTargetWithSave = (value) => {
+    setWeeklyTarget(value);
+    saveUserSettings({ weekly_target: value });
+  };
+
+  const setMonthlyTargetWithSave = (value) => {
+    setMonthlyTarget(value);
+    saveUserSettings({ monthly_target: value });
+  };
+
+  const setSecureModeWithSave = (value) => {
+    setSecureMode(value);
+    saveUserSettings({ secure_mode: value });
+  };
+
+  const setAiProviderWithSave = (value) => {
+    setAiProvider(value);
+    saveUserSettings({ ai_provider: value });
+  };
+
+  const setSelectedModelWithSave = (value) => {
+    setSelectedModel(value);
+    saveUserSettings({ selected_model: value });
+  };
+
+  const setAnthropicApiKeyWithSave = (value) => {
+    setAnthropicApiKey(value);
+    saveUserSettings({ anthropic_api_key: value });
+  };
+
+  const setOpenaiApiKeyWithSave = (value) => {
+    setOpenaiApiKey(value);
+    saveUserSettings({ openai_api_key: value });
+  };
+
+  // Définition des contrats
   const contracts = {
     MNQ: {
       name: 'Micro E-mini Nasdaq (MNQ)',
@@ -77,22 +179,37 @@ const MethodeAlpha = () => {
       description: 'Contrat standard Nasdaq',
       multiplier: 20,
       category: 'nasdaq'
+    },
+    MES: {
+      name: 'Micro E-mini S&P 500 (MES)',
+      margin: 40,
+      tickValue: 1.25,
+      tickSize: 0.25,
+      description: '1/10ème de l\'ES standard',
+      multiplier: 5,
+      category: 'sp500'
+    },
+    ES: {
+      name: 'E-mini S&P 500 (ES)',
+      margin: 800,
+      tickValue: 12.50,
+      tickSize: 0.25,
+      description: 'Contrat standard S&P 500',
+      multiplier: 50,
+      category: 'sp500'
     }
   };
 
-  // Calcul du capital actuel basé sur le journal
+  // Fonction pour calculer le solde actuel depuis le journal
   const calculateCurrentBalanceFromJournal = () => {
-    const initialCapitalNum = parseFloat(initialCapital);
-    if (!initialCapitalNum) return null;
+    let total = parseFloat(initialCapital) || 0;
     
-    const totalPnL = Object.values(tradingJournal).reduce((sum, day) => {
-      if (day.hasTraded && day.pnl) {
-        return sum + parseFloat(day.pnl);
-      }
-      return sum;
-    }, 0);
+    Object.values(tradingJournal).forEach(day => {
+      const pnl = parseFloat(day.pnl) || 0;
+      total += pnl;
+    });
     
-    return parseFloat((initialCapitalNum + totalPnL).toFixed(2));
+    return total;
   };
 
   // NOUVEAU : Calcul du Drawdown Dynamique
@@ -348,6 +465,13 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       const analysis = JSON.parse(responseText);
       setAiAnalysis(analysis);
       
+      // Sauvegarder l'analyse dans Supabase
+      try {
+        await saveAIAnalysis(analysis, selectedModel, aiProvider);
+      } catch (error) {
+        console.warn('Erreur sauvegarde analyse IA:', error);
+      }
+      
       // Stocker les recommandations pour le calculateur
       if (analysis.kpis) {
         const recommendedRisk = parseFloat(analysis.kpis.optimalRiskPerTrade.replace('$', ''));
@@ -453,17 +577,17 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     setShowDayModal(true);
   };
 
-  const saveDayData = () => {
+  const saveDayData = async () => {
     if (!selectedDate) return;
     
-    setTradingJournal(prev => ({
-      ...prev,
-      [selectedDate.dateKey]: { ...dayData }
-    }));
-    
-    setShowDayModal(false);
-    setSelectedDate(null);
-    setDayData({ pnl: '', notes: '', hasTraded: true });
+    try {
+      await saveJournalEntry(selectedDate.dateKey, dayData);
+      setShowDayModal(false);
+      setSelectedDate(null);
+      setDayData({ pnl: '', notes: '', hasTraded: true });
+    } catch (error) {
+      console.error('Erreur sauvegarde journal:', error);
+    }
   };
 
   // Stats du journal
@@ -737,6 +861,31 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     { id: 'settings', name: 'Paramètres', icon: Settings },
   ];
 
+  // Calculer automatiquement la position quand les paramètres changent
+  useEffect(() => {
+    if (capital && stopLossTicks) {
+      try {
+        calculatePositionSize();
+      } catch (error) {
+        console.error('Erreur calcul position:', error);
+        setResults(null);
+      }
+    }
+  }, [capital, stopLossTicks, riskPerTrade, dailyLossMax, aiRecommendedRisk, aiMaxDailyLoss]);
+
+  // Afficher loading pendant le chargement des données
+  if (dataLoading || !isDataLoaded) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-white mx-auto mb-4" />
+          <p className="text-white text-lg">Chargement de vos données...</p>
+          <p className="text-blue-200 text-sm mt-2">Synchronisation avec Supabase</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       {/* Header */}
@@ -745,7 +894,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="text-slate-600 hover:text-slate-900 lg:hidden"
+              className="text-slate-600 hover:text-slate-900"
             >
               {sidebarOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
             </button>
@@ -792,15 +941,23 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <User className="w-4 h-4 text-white" />
               </div>
-              <span className="text-sm font-medium text-slate-700">Trader Pro AI</span>
+              <span className="text-sm font-medium text-slate-700">{user?.email}</span>
             </div>
+            
+            <button
+              onClick={signOut}
+              className="flex items-center space-x-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors text-sm"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Déconnexion</span>
+            </button>
           </div>
         </div>
       </header>
 
       <div className="flex">
         {/* Sidebar */}
-        <div className={`${sidebarOpen ? 'w-64' : 'w-16'} transition-all duration-300 bg-white border-r border-slate-200 shadow-sm`}>
+        <div className={`${sidebarOpen ? 'w-64' : 'w-16'} transition-all duration-300 bg-white border-r border-slate-200 shadow-sm min-h-screen`}>
           <nav className="p-4 space-y-2">
             {navigation.map((item) => (
               <button
@@ -828,6 +985,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               recommendations={recommendations}
               drawdownProtection={drawdownProtection}
               monthlyTarget={monthlyTarget}
+              weeklyTarget={weeklyTarget}
+              initialCapital={initialCapital}
+              tradingJournal={tradingJournal}
               handleQuickAction={handleQuickAction}
               isAnalyzing={isAnalyzing}
               secureMode={secureMode}
@@ -887,28 +1047,28 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
           {activeTab === 'settings' && (
             <SettingsModule
               initialCapital={initialCapital}
-              setInitialCapital={setInitialCapital}
+              setInitialCapital={setInitialCapitalWithSave}
               currentBalance={currentBalance}
-              setCurrentBalance={setCurrentBalance}
+              setCurrentBalance={setCurrentBalanceWithSave}
               weeklyTarget={weeklyTarget}
-              setWeeklyTarget={setWeeklyTarget}
+              setWeeklyTarget={setWeeklyTargetWithSave}
               monthlyTarget={monthlyTarget}
-              setMonthlyTarget={setMonthlyTarget}
+              setMonthlyTarget={setMonthlyTargetWithSave}
               riskPerTrade={riskPerTrade}
-              setRiskPerTrade={setRiskPerTrade}
+              setRiskPerTrade={setRiskPerTradeWithSave}
               dailyLossMax={dailyLossMax}
-              setDailyLossMax={setDailyLossMax}
+              setDailyLossMax={setDailyLossMaxWithSave}
               anthropicApiKey={anthropicApiKey}
-              setAnthropicApiKey={setAnthropicApiKey}
+              setAnthropicApiKey={setAnthropicApiKeyWithSave}
               secureMode={secureMode}
-              setSecureMode={setSecureMode}
+              setSecureMode={setSecureModeWithSave}
               calculateCurrentBalanceFromJournal={calculateCurrentBalanceFromJournal}
               aiProvider={aiProvider}
-              setAiProvider={setAiProvider}
+              setAiProvider={setAiProviderWithSave}
               openaiApiKey={openaiApiKey}
-              setOpenaiApiKey={setOpenaiApiKey}
+              setOpenaiApiKey={setOpenaiApiKeyWithSave}
               selectedModel={selectedModel}
-              setSelectedModel={setSelectedModel}
+              setSelectedModel={setSelectedModelWithSave}
             />
           )}
         </div>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Calculator, CheckCircle, Skull, Brain } from 'lucide-react';
+import { formatCurrency, formatNumber, parseNumberInput } from '../../utils/formatters';
 
 const CalculatorModule = ({
   capital,
@@ -16,6 +17,32 @@ const CalculatorModule = ({
   aiRecommendedRisk,
   aiMaxDailyLoss
 }) => {
+  // Fonctions helpers pour éviter les erreurs de rendu
+  const getCalculatedBalance = () => {
+    try {
+      return calculateCurrentBalanceFromJournal?.() || null;
+    } catch (error) {
+      console.error('Erreur calcul balance:', error);
+      return null;
+    }
+  };
+
+  const getPlaceholderValue = () => {
+    const calculatedBalance = getCalculatedBalance();
+    return calculatedBalance ? calculatedBalance.toString() : currentBalance || "10000";
+  };
+
+  const renderBalanceInfo = () => {
+    const calculatedBalance = getCalculatedBalance();
+    if (calculatedBalance) {
+      return (
+        <div className="text-xs text-blue-600 mt-1">
+          Auto du Journal: ${calculatedBalance.toLocaleString()}
+        </div>
+      );
+    }
+    return null;
+  };
   return (
     <div className="space-y-6">
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
@@ -50,21 +77,13 @@ const CalculatorModule = ({
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Capital Trading ($)</label>
             <input
-              type="number"
+              type="text"
               value={capital}
-              onChange={(e) => setCapital(e.target.value)}
-              placeholder={(() => {
-                const calculatedBalance = calculateCurrentBalanceFromJournal();
-                return calculatedBalance ? calculatedBalance.toString() : currentBalance || "10000";
-              })()}
+              onChange={(e) => setCapital(parseNumberInput(e.target.value, 2))}
+              placeholder={getPlaceholderValue()}
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
-            {(() => {
-              const calculatedBalance = calculateCurrentBalanceFromJournal();
-              return calculatedBalance && (
-                <div className="text-xs text-blue-600 mt-1">Auto du Journal: ${calculatedBalance.toLocaleString()}</div>
-              );
-            })()}
+            {renderBalanceInfo()}
           </div>
           
           <div>
@@ -85,7 +104,7 @@ const CalculatorModule = ({
               {aiRecommendedRisk !== null 
                 ? `✨ Optimisé par IA (base: ${riskPerTrade}%)`
                 : recommendations && recommendations.riskAdjustment !== 1 
-                ? `Ajusté par IA: ${recommendations.adjustedRiskPercent.toFixed(2)}%` 
+                ? `Ajusté par IA: ${recommendations.adjustedRiskPercent?.toFixed(2) || 0}%` 
                 : 'Configuré dans Paramètres'
               }
             </div>
@@ -116,9 +135,9 @@ const CalculatorModule = ({
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">Stop Loss (Ticks)</label>
             <input
-              type="number"
+              type="text"
               value={stopLossTicks}
-              onChange={(e) => setStopLossTicks(e.target.value)}
+              onChange={(e) => setStopLossTicks(parseNumberInput(e.target.value, 1))}
               placeholder="20"
               className="w-full px-4 py-3 border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
@@ -126,7 +145,7 @@ const CalculatorModule = ({
           </div>
         </div>
 
-        {results && results.recommendations.length > 0 && (
+        {results && results.recommendations && results.recommendations.length > 0 && (
           <div className="space-y-6">
             {/* Résumé avec alertes IA */}
             <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-xl border border-blue-200">
@@ -144,7 +163,7 @@ const CalculatorModule = ({
               </div>
               <div className="grid md:grid-cols-4 gap-4">
                 <div className="text-center">
-                  <div className="text-2xl font-bold text-blue-600">${results.maxRiskPerTrade.toFixed(2)}</div>
+                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(results.maxRiskPerTrade)}</div>
                   <div className="text-sm text-slate-600">
                     Risque {aiRecommendedRisk !== null ? 'IA' : results.effectiveRiskPercent !== results.originalRiskPercent ? 'Ajusté IA' : 'Standard'}
                   </div>
@@ -160,8 +179,8 @@ const CalculatorModule = ({
                   <div className="text-2xl font-bold text-green-600">{results.maxTradesPerDay}</div>
                   <div className="text-sm text-slate-600">Trades Max/Jour</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-red-600">${results.maxDailyLoss.toFixed(2)}</div>
+                                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">{formatCurrency(results.maxDailyLoss)}</div>
                   <div className="text-sm text-slate-600">Limite Journalière</div>
                 </div>
               </div>
