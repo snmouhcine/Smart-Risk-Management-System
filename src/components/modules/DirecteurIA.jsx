@@ -231,8 +231,8 @@ const DirecteurIA = ({
       description: "🎯 Le pourcentage de trades gagnants dont vous avez besoin pour atteindre votre objectif mensuel.\n\n📊 Basé sur :\n• Votre ratio risque/récompense moyen\n• Le montant restant à gagner\n• Le nombre de trades prévus\n\n💡 Si votre win rate actuel est inférieur à ce requis, vous devez soit améliorer votre sélection de trades, soit augmenter votre ratio R:R."
     },
     capitalAtRisk: {
-      title: "Capital à Risque Total",
-      description: "💼 Montant total de votre capital qui pourrait être en danger selon votre stratégie actuelle.\n\n🔍 Inclut :\n• Positions ouvertes actuelles\n• Exposition maximale possible\n• Marge utilisée\n\n⚠️ Ne devrait jamais dépasser 20-30% de votre capital total pour une gestion de risque saine."
+      title: "Capital à Risque",
+      description: "🛡️ C'est le pourcentage de votre capital total qui est actuellement exposé au risque.\n\n💡 **À quoi ça sert ?**\n• Vous montre votre exposition totale au risque\n• Vous aide à ne pas surexposer votre compte\n• Protection contre les pertes catastrophiques\n\n📊 **Comment l'utiliser ?**\n• Restez sous 2-3% pour un trading sécurisé\n• Si > 5%, vous êtes surexposé\n• Ajustez vos positions en conséquence\n\n⚠️ **Exemple** : Si vous avez 3 trades ouverts risquant chacun 1%, votre capital à risque est 3%."
     }
   };
 
@@ -291,42 +291,47 @@ const DirecteurIA = ({
                 <HelpCircle className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            <div className="relative h-32">
-              <svg className="w-full h-full" viewBox="0 0 200 100">
+            <div className="relative h-40">
+              <svg className="w-full h-full" viewBox="0 0 200 120">
                 {/* Arc de fond */}
                 <path
-                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  d="M 30 90 A 60 60 0 0 1 170 90"
                   fill="none"
                   stroke="#e2e8f0"
-                  strokeWidth="12"
+                  strokeWidth="20"
                 />
                 {/* Arc de progression */}
                 <path
-                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  d="M 30 90 A 60 60 0 0 1 170 90"
                   fill="none"
                   stroke={dangerLevel > 60 ? '#ef4444' : dangerLevel > 30 ? '#f59e0b' : '#10b981'}
-                  strokeWidth="12"
-                  strokeDasharray={`${dangerLevel * 1.57} 157`}
+                  strokeWidth="20"
+                  strokeDasharray={`${dangerLevel * 1.41} 141`}
                   strokeLinecap="round"
                   className="transition-all duration-1000"
                 />
+                {/* Centre du cadran */}
+                <circle cx="100" cy="90" r="8" fill="#1e293b" />
                 {/* Aiguille */}
                 <line
                   x1="100"
-                  y1="80"
-                  x2={100 + Math.cos((Math.PI - (dangerLevel * Math.PI / 100))) * 45}
-                  y2={80 + Math.sin((Math.PI - (dangerLevel * Math.PI / 100))) * 45}
+                  y1="90"
+                  x2={100 + Math.cos((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
+                  y2={90 + Math.sin((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
                   stroke="#1e293b"
-                  strokeWidth="3"
+                  strokeWidth="4"
                   strokeLinecap="round"
                   className="transition-all duration-1000"
                 />
-                <circle cx="100" cy="80" r="5" fill="#1e293b" />
+                {/* Marqueurs */}
+                <text x="30" y="100" className="fill-slate-400 text-xs">0</text>
+                <text x="100" y="25" className="fill-slate-400 text-xs" textAnchor="middle">50</text>
+                <text x="170" y="100" className="fill-slate-400 text-xs" textAnchor="end">100</text>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center mt-8">
-                  <div className="text-3xl font-bold text-slate-900">{dangerLevel}%</div>
-                  <div className={`text-sm font-medium ${dangerLevel > 60 ? 'text-red-600' : dangerLevel > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
+                <div className="text-center mt-12">
+                  <div className="text-4xl font-bold text-slate-900">{dangerLevel}%</div>
+                  <div className={`text-sm font-medium mt-1 ${dangerLevel > 60 ? 'text-red-600' : dangerLevel > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
                     {dangerLevel > 60 ? 'CRITIQUE' : dangerLevel > 30 ? 'ATTENTION' : 'SAFE'}
                   </div>
                 </div>
@@ -349,39 +354,42 @@ const DirecteurIA = ({
                 <HelpCircle className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            <div className="relative h-32">
-              <svg className="w-full h-full" viewBox="0 0 200 100">
+            <div className="relative h-40">
+              <svg className="w-full h-full" viewBox="0 0 200 120">
                 <path
-                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  d="M 30 90 A 60 60 0 0 1 170 90"
                   fill="none"
                   stroke="#e2e8f0"
-                  strokeWidth="12"
+                  strokeWidth="20"
                 />
                 <path
-                  d="M 20 80 A 60 60 0 0 1 180 80"
+                  d="M 30 90 A 60 60 0 0 1 170 90"
                   fill="none"
                   stroke={opportunityLevel > 70 ? '#10b981' : opportunityLevel > 40 ? '#3b82f6' : '#6b7280'}
-                  strokeWidth="12"
-                  strokeDasharray={`${opportunityLevel * 1.57} 157`}
+                  strokeWidth="20"
+                  strokeDasharray={`${opportunityLevel * 1.41} 141`}
                   strokeLinecap="round"
                   className="transition-all duration-1000"
                 />
+                <circle cx="100" cy="90" r="8" fill="#1e293b" />
                 <line
                   x1="100"
-                  y1="80"
-                  x2={100 + Math.cos((Math.PI - (opportunityLevel * Math.PI / 100))) * 45}
-                  y2={80 + Math.sin((Math.PI - (opportunityLevel * Math.PI / 100))) * 45}
+                  y1="90"
+                  x2={100 + Math.cos((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
+                  y2={90 + Math.sin((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
                   stroke="#1e293b"
-                  strokeWidth="3"
+                  strokeWidth="4"
                   strokeLinecap="round"
                   className="transition-all duration-1000"
                 />
-                <circle cx="100" cy="80" r="5" fill="#1e293b" />
+                <text x="30" y="100" className="fill-slate-400 text-xs">0</text>
+                <text x="100" y="25" className="fill-slate-400 text-xs" textAnchor="middle">50</text>
+                <text x="170" y="100" className="fill-slate-400 text-xs" textAnchor="end">100</text>
               </svg>
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center mt-8">
-                  <div className="text-3xl font-bold text-slate-900">{opportunityLevel}%</div>
-                  <div className={`text-sm font-medium ${opportunityLevel > 70 ? 'text-green-600' : opportunityLevel > 40 ? 'text-blue-600' : 'text-gray-600'}`}>
+                <div className="text-center mt-12">
+                  <div className="text-4xl font-bold text-slate-900">{opportunityLevel}%</div>
+                  <div className={`text-sm font-medium mt-1 ${opportunityLevel > 70 ? 'text-green-600' : opportunityLevel > 40 ? 'text-blue-600' : 'text-gray-600'}`}>
                     {opportunityLevel > 70 ? 'BULLISH' : opportunityLevel > 40 ? 'NEUTRE' : 'BEARISH'}
                   </div>
                 </div>
@@ -404,13 +412,13 @@ const DirecteurIA = ({
                 <HelpCircle className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            <div className="flex flex-col items-center justify-center h-32">
-              <div className="text-4xl font-bold text-slate-900 mb-2">{currentTime}</div>
-              <div className={`px-4 py-2 rounded-full ${timing.bg} flex items-center space-x-2`}>
-                <span className={`text-xl ${timing.color}`}>{timing.icon}</span>
-                <span className={`font-semibold ${timing.color}`}>{timing.status}</span>
+            <div className="flex flex-col items-center justify-center h-40">
+              <div className="text-5xl font-bold text-slate-900 mb-3">{currentTime}</div>
+              <div className={`px-6 py-3 rounded-full ${timing.bg} flex items-center space-x-3`}>
+                <span className={`text-2xl ${timing.color}`}>{timing.icon}</span>
+                <span className={`font-bold text-lg ${timing.color}`}>{timing.status}</span>
               </div>
-              <div className="text-xs text-slate-500 mt-2">
+              <div className="text-sm text-slate-500 mt-3">
                 Zone optimale: 15h30-17h30
               </div>
             </div>
@@ -554,7 +562,11 @@ const DirecteurIA = ({
                 <Info className="w-3 h-3 text-slate-400" />
               </button>
             </div>
-            <div className="text-lg font-bold text-slate-900">{aiAnalysis.kpis.tradesLeftBudget}</div>
+            <div className="text-lg font-bold text-slate-900">
+              {typeof aiAnalysis.kpis.tradesLeftBudget === 'string' && aiAnalysis.kpis.tradesLeftBudget.includes('(') 
+                ? aiAnalysis.kpis.tradesLeftBudget.split(' ')[0]
+                : aiAnalysis.kpis.tradesLeftBudget}
+            </div>
           </div>
           <div className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between">
@@ -578,7 +590,11 @@ const DirecteurIA = ({
                 <Info className="w-3 h-3 text-slate-400" />
               </button>
             </div>
-            <div className="text-lg font-bold text-slate-900">{aiAnalysis.kpis.winRateRequired}</div>
+            <div className="text-lg font-bold text-slate-900">
+              {typeof aiAnalysis.kpis.winRateRequired === 'string' && aiAnalysis.kpis.winRateRequired.includes('(')
+                ? aiAnalysis.kpis.winRateRequired.split(' ')[0]
+                : aiAnalysis.kpis.winRateRequired}
+            </div>
           </div>
           <div className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between">
@@ -590,7 +606,11 @@ const DirecteurIA = ({
                 <Info className="w-3 h-3 text-slate-400" />
               </button>
             </div>
-            <div className="text-lg font-bold text-slate-900">${aiAnalysis.kpis.capitalAtRisk}</div>
+            <div className="text-lg font-bold text-slate-900">
+              {typeof aiAnalysis.kpis.capitalAtRisk === 'string' 
+                ? aiAnalysis.kpis.capitalAtRisk.replace(/\$/, '')
+                : aiAnalysis.kpis.capitalAtRisk}
+            </div>
           </div>
         </div>
       )}
