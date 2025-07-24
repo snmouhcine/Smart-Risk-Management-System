@@ -3,6 +3,7 @@ import {
   Brain, Zap, AlertTriangle, Target, TrendingUp, Shield,
   Cpu, LineChart, Lock, DollarSign
 } from 'lucide-react';
+import { formatCurrency, formatNumber } from '../../utils/formatters';
 
 const DirecteurIA = ({
   aiAnalysis,
@@ -99,7 +100,7 @@ const DirecteurIA = ({
                 <h3 className="text-sm font-medium text-slate-600">PERTE MAX AUJOURD'HUI</h3>
                 <AlertTriangle className="w-5 h-5 text-red-500" />
               </div>
-              <div className="text-2xl font-bold text-red-600">{aiAnalysis.kpis.maxLossToday}</div>
+              <div className="text-2xl font-bold text-red-600">{formatNumber(parseFloat(aiAnalysis.kpis.maxLossToday.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Limite absolue journalière</div>
             </div>
 
@@ -108,7 +109,7 @@ const DirecteurIA = ({
                 <h3 className="text-sm font-medium text-slate-600">RISQUE OPTIMAL</h3>
                 <Target className="w-5 h-5 text-blue-500" />
               </div>
-              <div className="text-2xl font-bold text-blue-600">{aiAnalysis.kpis.optimalRiskPerTrade}</div>
+              <div className="text-2xl font-bold text-blue-600">{formatNumber(parseFloat(aiAnalysis.kpis.optimalRiskPerTrade.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Par trade recommandé</div>
             </div>
 
@@ -117,7 +118,7 @@ const DirecteurIA = ({
                 <h3 className="text-sm font-medium text-slate-600">GAIN MIN REQUIS</h3>
                 <TrendingUp className="w-5 h-5 text-green-500" />
               </div>
-              <div className="text-2xl font-bold text-green-600">{aiAnalysis.kpis.minDailyGainRequired}</div>
+              <div className="text-2xl font-bold text-green-600">{formatNumber(parseFloat(aiAnalysis.kpis.minDailyGainRequired.replace(/[\$,]/g, '')))}</div>
               <div className="text-xs text-slate-500">Par jour pour objectif</div>
             </div>
 

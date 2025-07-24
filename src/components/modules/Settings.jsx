@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Settings, Brain, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { AI_MODELS, testAPIConnection } from '../../utils/aiProviders';
-import { parseNumberInput } from '../../utils/formatters';
+import { parseNumberInput, formatCurrency } from '../../utils/formatters';
 
 const SettingsModule = ({
   initialCapital,
@@ -91,9 +91,9 @@ const SettingsModule = ({
                   className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 />
                 <div className="text-xs text-purple-600 mt-1">⚡ Base pour TOUS les calculs de risque (compound)</div>
-                {calculateCurrentBalanceFromJournal() && (
-                  <div className="text-xs text-green-600 mt-1">📅 Auto-calculé du journal: ${calculateCurrentBalanceFromJournal().toLocaleString()}</div>
-                )}
+                          {calculateCurrentBalanceFromJournal() && (
+            <div className="text-xs text-green-600 mt-1">📅 Auto-calculé du journal: {formatCurrency(calculateCurrentBalanceFromJournal())}</div>
+          )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-2">Objectif Hebdomadaire (%)</label>

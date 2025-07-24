@@ -93,6 +93,16 @@ const MethodeAlpha = () => {
     }
   }, [userSettings, capital]);
 
+  // Déclencher les calculs dès que les données sont chargées
+  useEffect(() => {
+    if (isDataLoaded && userSettings) {
+      // Petite attente pour s'assurer que tous les états sont synchronisés
+      setTimeout(() => {
+        updateRecommendations();
+      }, 100);
+    }
+  }, [isDataLoaded, userSettings]);
+
 
 
   // Fonction pour sauvegarder les paramètres
@@ -209,7 +219,8 @@ const MethodeAlpha = () => {
       total += pnl;
     });
     
-    return total;
+    // Arrondir à 2 décimales pour éviter les erreurs de précision floating point
+    return Math.round(total * 100) / 100;
   };
 
   // NOUVEAU : Calcul du Drawdown Dynamique
@@ -757,10 +768,27 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     };
   };
 
+  // Calcul des recommandations intelligentes (toujours exécuté)
+  const updateRecommendations = () => {
+    const calculatedBalance = calculateCurrentBalanceFromJournal();
+    const capitalNum = calculatedBalance || parseFloat(currentBalance || capital);
+    
+    if (!capitalNum || capitalNum <= 0) {
+      return;
+    }
+
+    const smartRec = calculateSmartRecommendations();
+    setRecommendations(smartRec);
+    setDrawdownProtection(smartRec?.drawdownProtection);
+  };
+
   const calculatePositionSize = () => {
     const calculatedBalance = calculateCurrentBalanceFromJournal();
     const capitalNum = calculatedBalance || parseFloat(currentBalance || capital);
     const stopLossTicksNum = parseFloat(stopLossTicks);
+    
+    // Toujours mettre à jour les recommandations
+    updateRecommendations();
     
     if (!capitalNum || capitalNum <= 0 || !stopLossTicksNum || stopLossTicksNum <= 0) {
       setResults(null);
@@ -810,14 +838,19 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       stopLossTicks: stopLossTicksNum, effectiveRiskPercent,
       originalRiskPercent: riskPerTrade, recommendations: positionRecommendations
     });
-
-    setRecommendations(smartRec);
-    setDrawdownProtection(smartRec?.drawdownProtection);
   };
 
+  // Effect pour les recommandations (s'exécute même sans stopLossTicks)
   useEffect(() => {
-    calculatePositionSize();
-  }, [capital, currentBalance, riskPerTrade, dailyLossMax, stopLossTicks, initialCapital, weeklyTarget, monthlyTarget, secureMode, tradingJournal]);
+    updateRecommendations();
+  }, [capital, currentBalance, riskPerTrade, dailyLossMax, initialCapital, weeklyTarget, monthlyTarget, secureMode, tradingJournal, aiRecommendedRisk, aiMaxDailyLoss]);
+
+  // Effect pour le calcul de position (nécessite stopLossTicks)
+  useEffect(() => {
+    if (stopLossTicks) {
+      calculatePositionSize();
+    }
+  }, [capital, currentBalance, riskPerTrade, dailyLossMax, stopLossTicks, initialCapital, weeklyTarget, monthlyTarget, secureMode, tradingJournal, aiRecommendedRisk, aiMaxDailyLoss]);
 
   const getStatusStyles = (status) => {
     switch (status) {

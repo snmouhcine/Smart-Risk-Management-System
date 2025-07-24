@@ -37,7 +37,7 @@ const CalculatorModule = ({
     if (calculatedBalance) {
       return (
         <div className="text-xs text-blue-600 mt-1">
-          Auto du Journal: ${calculatedBalance.toLocaleString()}
+          Auto du Journal: {formatCurrency(calculatedBalance)}
         </div>
       );
     }

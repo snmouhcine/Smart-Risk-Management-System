@@ -142,7 +142,7 @@ const Journal = ({
                     {dayData && dayData.hasTraded && (
                       <div className="text-xs mt-1">
                         {parseFloat(dayData.pnl) > 0 ? '+' : ''}
-                        {parseFloat(dayData.pnl) ? `$${parseFloat(dayData.pnl).toFixed(0)}` : '$0'}
+                        {parseFloat(dayData.pnl) ? formatCurrency(parseFloat(dayData.pnl)) : '$0'}
                       </div>
                     )}
                     {dayData && !dayData.hasTraded && (
