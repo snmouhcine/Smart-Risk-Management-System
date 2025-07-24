@@ -2,7 +2,8 @@ import React from 'react';
 import { 
   DollarSign, TrendingUp, Target, Shield, AlertTriangle, 
   Brain, Calculator, Lock, Skull, Flame, AlertCircle,
-  LineChart, Cpu, Activity
+  LineChart, Cpu, Activity, Trophy, Star, Zap, Award,
+  TrendingDown, Calendar, CheckCircle, XCircle, Medal
 } from 'lucide-react';
 import { formatCurrency, formatPercentage, calculateMonthlyTargetAmount, calculateWeeklyTargetAmount } from '../../utils/formatters';
 
@@ -25,8 +26,357 @@ const Dashboard = ({
   const actualBalance = calculatedBalance || parseFloat(currentBalance) || 0;
   const monthlyTargetInfo = calculateMonthlyTargetAmount(actualBalance, initialCapital, monthlyTarget);
   const weeklyTargetInfo = calculateWeeklyTargetAmount(tradingJournal, actualBalance, weeklyTarget);
+
+  // Calculs pour la gamification
+  const calculateGamificationData = () => {
+    // Calcul des statistiques de base
+    const totalTrades = Object.values(tradingJournal || {}).filter(day => day.hasTraded).length;
+    const profitableDays = Object.values(tradingJournal || {}).filter(day => day.hasTraded && parseFloat(day.pnl) > 0).length;
+    const winRate = totalTrades > 0 ? (profitableDays / totalTrades) * 100 : 0;
+    
+    // Calcul des séries (streaks)
+    let currentProfitStreak = 0;
+    let currentDisciplineStreak = 0;
+    let longestProfitStreak = 0;
+    
+    const sortedDays = Object.entries(tradingJournal || {})
+      .sort(([a], [b]) => new Date(b) - new Date(a));
+    
+    // Calcul de la série de jours profitables
+    for (const [date, day] of sortedDays) {
+      if (day.hasTraded && parseFloat(day.pnl) > 0) {
+        currentProfitStreak++;
+        longestProfitStreak = Math.max(longestProfitStreak, currentProfitStreak);
+      } else if (day.hasTraded) {
+        break;
+      }
+    }
+
+    // Calcul du niveau et XP
+    const calculateXP = () => {
+      let xp = 0;
+      xp += totalTrades * 10; // 10 XP par trade
+      xp += profitableDays * 25; // 25 XP par jour profitable
+      xp += monthlyTargetInfo.isAchieved ? 500 : 0; // 500 XP pour objectif mensuel
+      xp += weeklyTargetInfo.isAchieved ? 200 : 0; // 200 XP pour objectif hebdo
+      xp += currentProfitStreak * 50; // 50 XP par jour de série
+      return xp;
+    };
+
+    const totalXP = calculateXP();
+    const level = Math.floor(totalXP / 1000) + 1;
+    const currentLevelXP = totalXP % 1000;
+    const xpToNextLevel = 1000 - currentLevelXP;
+
+    // Déterminer le titre du niveau
+    const getLevelTitle = (level) => {
+      if (level >= 10) return { title: "🏆 LEGEND TRADER", color: "from-purple-600 to-pink-600" };
+      if (level >= 7) return { title: "⚡ MASTER TRADER", color: "from-orange-500 to-red-600" };
+      if (level >= 5) return { title: "💎 EXPERT TRADER", color: "from-blue-500 to-purple-600" };
+      if (level >= 3) return { title: "📈 TRADER CONFIRMÉ", color: "from-green-500 to-emerald-600" };
+      return { title: "🌱 TRADER DÉBUTANT", color: "from-gray-500 to-slate-600" };
+    };
+
+    const levelInfo = getLevelTitle(level);
+
+    // Calcul des badges
+    const badges = [];
+    
+    // Badge première semaine profitable
+    const weeklyPnLs = [];
+    for (let i = 0; i < 4; i++) {
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - (i * 7));
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+      
+      let weekPnL = 0;
+      for (let j = 0; j < 7; j++) {
+        const checkDate = new Date(weekStart);
+        checkDate.setDate(checkDate.getDate() + j);
+        const dateKey = checkDate.toISOString().split('T')[0];
+        if (tradingJournal[dateKey]?.hasTraded) {
+          weekPnL += parseFloat(tradingJournal[dateKey].pnl || 0);
+        }
+      }
+      if (weekPnL > 0) weeklyPnLs.push(weekPnL);
+    }
+    
+    if (weeklyPnLs.length > 0) {
+      badges.push({
+        id: 'first-profitable-week',
+        name: 'Première Semaine Verte',
+        icon: Trophy,
+        color: 'text-green-600',
+        bgColor: 'bg-green-100',
+        description: 'Première semaine profitable'
+      });
+    }
+
+    // Badge objectif mensuel
+    if (monthlyTargetInfo.isAchieved) {
+      badges.push({
+        id: 'monthly-goal',
+        name: 'Objectif Mensuel',
+        icon: Target,
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-100',
+        description: `${monthlyTarget}% atteint ce mois`
+      });
+    }
+
+    // Badge série de victoires
+    if (currentProfitStreak >= 3) {
+      badges.push({
+        id: 'winning-streak',
+        name: `Série ${currentProfitStreak} Jours`,
+        icon: Flame,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-100',
+        description: `${currentProfitStreak} jours profitables consécutifs`
+      });
+    }
+
+    // Badge discipline
+    if (recommendations?.adjustedRiskPercent <= 1.5 && totalTrades >= 10) {
+      badges.push({
+        id: 'discipline',
+        name: 'Trader Discipliné',
+        icon: Shield,
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-100',
+        description: 'Respect constant du risque'
+      });
+    }
+
+    // Badge comeback
+    if (drawdownProtection?.drawdownPercent < 5 && drawdownProtection?.daysInDrawdown > 5) {
+      badges.push({
+        id: 'comeback',
+        name: 'Comeback King',
+        icon: TrendingUp,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-100',
+        description: 'Récupération après drawdown'
+      });
+    }
+
+    // Badge perfect week
+    if (weeklyTargetInfo.isAchieved && weeklyTargetInfo.currentWeeklyPnL > weeklyTargetInfo.targetAmount * 1.5) {
+      badges.push({
+        id: 'perfect-week',
+        name: 'Semaine Parfaite',
+        icon: Star,
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-100',
+        description: 'Dépassé 150% de l\'objectif hebdo'
+      });
+    }
+
+    // Badge early bird (objectif atteint avant mi-mois)
+    const dayOfMonth = new Date().getDate();
+    if (monthlyTargetInfo.isAchieved && dayOfMonth <= 15) {
+      badges.push({
+        id: 'early-bird',
+        name: 'Early Bird',
+        icon: Calendar,
+        color: 'text-cyan-600',
+        bgColor: 'bg-cyan-100',
+        description: 'Objectif mensuel avant le 15'
+      });
+    }
+
+    // Badge risk master
+    if (totalTrades >= 20 && recommendations?.adjustedRiskPercent <= 1) {
+      badges.push({
+        id: 'risk-master',
+        name: 'Maître du Risque',
+        icon: Shield,
+        color: 'text-red-600',
+        bgColor: 'bg-red-100',
+        description: '20+ trades avec risque < 1%'
+      });
+    }
+
+    // Défis quotidiens
+    const today = new Date().toISOString().split('T')[0];
+    const todayData = tradingJournal?.[today];
+    const todayPnL = todayData?.hasTraded ? parseFloat(todayData.pnl || 0) : 0;
+    const dailyTarget = monthlyTargetInfo.targetAmount / 20;
+    
+    // Vérifier si on a tradé aux bonnes heures
+    const hour = new Date().getHours();
+    const hasTradesOutsideHours = todayData?.hasTraded && (hour < 15.5 || hour >= 17.5);
+    
+    const dailyChallenges = [
+      {
+        id: 'risk-respect',
+        title: 'Respecter le risque de 1%',
+        description: 'Ne risquer que 1% max par trade aujourd\'hui',
+        completed: recommendations?.adjustedRiskPercent <= 1,
+        xp: 50
+      },
+      {
+        id: 'optimal-hours',
+        title: 'Trading aux bonnes heures',
+        description: 'Ne trader qu\'entre 15h30 et 17h30',
+        completed: !hasTradesOutsideHours,
+        xp: 30
+      },
+      {
+        id: 'profit-target',
+        title: 'Objectif journalier',
+        description: `Gagner au moins ${formatCurrency(dailyTarget)}`,
+        completed: todayPnL >= dailyTarget,
+        xp: 100
+      }
+    ];
+
+    return {
+      level,
+      levelInfo,
+      totalXP,
+      currentLevelXP,
+      xpToNextLevel,
+      badges,
+      currentProfitStreak,
+      winRate,
+      totalTrades,
+      dailyChallenges
+    };
+  };
+
+  const gamificationData = calculateGamificationData();
+
   return (
     <div className="space-y-6">
+      {/* NOUVELLE Section Gamification */}
+      <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl text-white">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center">
+              <Trophy className="w-8 h-8 mr-3 text-yellow-400" />
+              Trading Performance & Achievements
+            </h2>
+            <p className="text-slate-300 mt-1">Suivez votre progression et débloquez des récompenses</p>
+          </div>
+          <div className="text-right">
+            <div className={`text-3xl font-bold bg-gradient-to-r ${gamificationData.levelInfo.color} bg-clip-text text-transparent`}>
+              Niveau {gamificationData.level}
+            </div>
+            <div className="text-sm text-slate-300">{gamificationData.levelInfo.title}</div>
+          </div>
+        </div>
+
+        {/* Barre de progression XP */}
+        <div className="mb-6">
+          <div className="flex justify-between text-sm text-slate-300 mb-2">
+            <span>{gamificationData.totalXP} XP Total</span>
+            <span>{gamificationData.xpToNextLevel} XP jusqu'au niveau {gamificationData.level + 1}</span>
+          </div>
+          <div className="w-full bg-slate-700 rounded-full h-3">
+            <div 
+              className={`h-3 rounded-full bg-gradient-to-r ${gamificationData.levelInfo.color} transition-all duration-1000`}
+              style={{ width: `${(gamificationData.currentLevelXP / 1000) * 100}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Stats rapides */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <Flame className="w-5 h-5 text-orange-400" />
+              <span className="text-2xl font-bold">{gamificationData.currentProfitStreak}</span>
+            </div>
+            <div className="text-xs text-slate-400">Jours Profit Streak</div>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <Star className="w-5 h-5 text-yellow-400" />
+              <span className="text-2xl font-bold">{gamificationData.winRate.toFixed(0)}%</span>
+            </div>
+            <div className="text-xs text-slate-400">Win Rate</div>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <Award className="w-5 h-5 text-purple-400" />
+              <span className="text-2xl font-bold">{gamificationData.badges.length}</span>
+            </div>
+            <div className="text-xs text-slate-400">Badges Débloqués</div>
+          </div>
+          
+          <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
+            <div className="flex items-center justify-between mb-2">
+              <Zap className="w-5 h-5 text-blue-400" />
+              <span className="text-2xl font-bold">{gamificationData.totalTrades}</span>
+            </div>
+            <div className="text-xs text-slate-400">Trades Total</div>
+          </div>
+        </div>
+
+        {/* Badges */}
+        {gamificationData.badges.length > 0 && (
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3 flex items-center">
+              <Medal className="w-5 h-5 mr-2 text-yellow-400" />
+              Badges Débloqués
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {gamificationData.badges.map((badge) => {
+                const Icon = badge.icon;
+                return (
+                  <div key={badge.id} className="bg-slate-800/50 rounded-xl p-4 border border-slate-700 hover:border-slate-600 transition-all">
+                    <div className={`w-12 h-12 ${badge.bgColor} rounded-xl flex items-center justify-center mb-2`}>
+                      <Icon className={`w-6 h-6 ${badge.color}`} />
+                    </div>
+                    <div className="text-sm font-semibold">{badge.name}</div>
+                    <div className="text-xs text-slate-400 mt-1">{badge.description}</div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Défis quotidiens */}
+        <div>
+          <h3 className="text-lg font-semibold mb-3 flex items-center">
+            <Target className="w-5 h-5 mr-2 text-green-400" />
+            Défis du Jour
+          </h3>
+          <div className="grid md:grid-cols-3 gap-3">
+            {gamificationData.dailyChallenges.map((challenge) => (
+              <div 
+                key={challenge.id} 
+                className={`bg-slate-800/50 rounded-xl p-4 border ${
+                  challenge.completed ? 'border-green-500' : 'border-slate-700'
+                } transition-all`}
+              >
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex-1">
+                    <div className="font-semibold text-sm">{challenge.title}</div>
+                    <div className="text-xs text-slate-400 mt-1">{challenge.description}</div>
+                  </div>
+                  {challenge.completed ? (
+                    <CheckCircle className="w-5 h-5 text-green-400 flex-shrink-0 ml-2" />
+                  ) : (
+                    <XCircle className="w-5 h-5 text-slate-500 flex-shrink-0 ml-2" />
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-3">
+                  <span className="text-xs text-slate-400">Récompense</span>
+                  <span className={`text-sm font-bold ${challenge.completed ? 'text-green-400' : 'text-slate-500'}`}>
+                    +{challenge.xp} XP
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* NOUVELLE Alerte de Protection Drawdown */}
       {drawdownProtection?.alert && (
         <div className={`p-6 rounded-2xl shadow-lg border-2 ${
