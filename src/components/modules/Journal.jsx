@@ -1,5 +1,5 @@
-import React from 'react';
-import { Calendar, AlertTriangle, BarChart3, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { Calendar, AlertTriangle, BarChart3, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
 import { formatCurrency, formatNumber, parseNumberInput } from '../../utils/formatters';
 
 const Journal = ({
@@ -19,13 +19,31 @@ const Journal = ({
   getDayStatus
 }) => {
   const today = new Date();
-  const currentMonth = today.getMonth();
-  const currentYear = today.getFullYear();
-  const daysInMonth = getDaysInMonth(today);
-  const firstDayOfMonth = getFirstDayOfMonth(today);
+  
+  // État pour la navigation dans l'historique
+  const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  
+  const currentMonth = viewDate.getMonth();
+  const currentYear = viewDate.getFullYear();
+  const daysInMonth = getDaysInMonth(viewDate);
+  const firstDayOfMonth = getFirstDayOfMonth(viewDate);
   const monthNames = ["Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre", "Novembre", "Décembre"];
   const dayNames = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
   const stats = getJournalStats();
+
+  // Fonctions de navigation
+  const navigateMonth = (direction) => {
+    const newDate = new Date(viewDate);
+    newDate.setMonth(newDate.getMonth() + direction);
+    setViewDate(newDate);
+  };
+
+  const goToCurrentMonth = () => {
+    setViewDate(new Date(today.getFullYear(), today.getMonth(), 1));
+  };
+
+  // Vérifier si on est sur le mois actuel
+  const isCurrentMonth = viewDate.getMonth() === today.getMonth() && viewDate.getFullYear() === today.getFullYear();
 
   return (
     <div className="space-y-6">
@@ -71,11 +89,57 @@ const Journal = ({
 
         {/* Calendrier */}
         <div>
-          {/* Header du calendrier */}
+          {/* Header du calendrier avec navigation */}
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-slate-800">
-              {monthNames[currentMonth]} {currentYear}
-            </h3>
+            <div className="flex items-center space-x-4">
+              {/* Boutons de navigation */}
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => navigateMonth(-1)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Mois précédent"
+                >
+                  <ChevronLeft className="w-5 h-5 text-slate-600" />
+                </button>
+                
+                <button
+                  onClick={() => navigateMonth(1)}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  title="Mois suivant"
+                >
+                  <ChevronRight className="w-5 h-5 text-slate-600" />
+                </button>
+                
+                {!isCurrentMonth && (
+                  <button
+                    onClick={goToCurrentMonth}
+                    className="p-2 hover:bg-blue-100 rounded-lg transition-colors text-blue-600"
+                    title="Retour au mois actuel"
+                  >
+                    <RotateCcw className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Titre du mois avec indicateur */}
+              <div className="flex items-center space-x-3">
+                <h3 className="text-lg font-semibold text-slate-800">
+                  {monthNames[currentMonth]} {currentYear}
+                </h3>
+                {isCurrentMonth && (
+                  <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
+                    Actuel
+                  </span>
+                )}
+                {!isCurrentMonth && (
+                  <span className="px-2 py-1 bg-slate-100 text-slate-600 text-xs font-medium rounded-full">
+                    Historique
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Légende */}
             <div className="flex items-center space-x-4 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-3 h-3 bg-green-500 rounded"></div>
@@ -111,10 +175,17 @@ const Journal = ({
               const day = i + 1;
               const dateKey = getDateKey(currentYear, currentMonth, day);
               const status = getDayStatus(dateKey);
-              const isToday = day === today.getDate();
+              const isToday = isCurrentMonth && day === today.getDate();
               const dayData = tradingJournal[dateKey];
               
+              // Vérifier si c'est un jour futur
+              const currentDate = new Date(currentYear, currentMonth, day);
+              const isFutureDay = currentDate > today;
+              
               const getStatusStyles = () => {
+                if (isFutureDay) {
+                  return 'bg-slate-50 text-slate-400 cursor-not-allowed';
+                }
                 switch (status) {
                   case 'profit':
                     return 'bg-green-500 text-white hover:bg-green-600';
@@ -132,8 +203,9 @@ const Journal = ({
               return (
                 <button
                   key={day}
-                  onClick={() => handleDayClick(currentYear, currentMonth, day)}
-                  className={`p-3 rounded-lg text-sm font-medium transition-all hover:shadow-md ${getStatusStyles()} ${
+                  onClick={() => !isFutureDay && handleDayClick(currentYear, currentMonth, day)}
+                  disabled={isFutureDay}
+                  className={`p-3 rounded-lg text-sm font-medium transition-all ${!isFutureDay ? 'hover:shadow-md' : ''} ${getStatusStyles()} ${
                     isToday ? 'ring-2 ring-blue-500 ring-offset-2' : ''
                   }`}
                 >
