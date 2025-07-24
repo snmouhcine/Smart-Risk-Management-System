@@ -46,7 +46,7 @@ const MethodeAlpha = () => {
   const [monthlyTarget, setMonthlyTarget] = useState(8);
 
   // États spécifiques
-  const [recommendations, setRecommendations] = useState('');
+  const [recommendations, setRecommendations] = useState(null);
   const [secureMode, setSecureMode] = useState(false);
 
   // États pour le journal
@@ -55,7 +55,7 @@ const MethodeAlpha = () => {
   const [dayData, setDayData] = useState({ pnl: '', notes: '', hasTraded: true });
 
   // États pour l'IA
-  const [aiAnalysis, setAiAnalysis] = useState('');
+  const [aiAnalysis, setAiAnalysis] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [drawdownProtection, setDrawdownProtection] = useState(null);
   const [monthlyPeak, setMonthlyPeak] = useState(0);
@@ -1078,8 +1078,14 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               stats={getJournalStats()}
               capital={parseFloat(capital) || parseFloat(currentBalance) || 0}
               journalData={tradingJournal}
-              monthlyObjective={monthlyTarget}
-              weeklyObjective={weeklyTarget}
+              monthlyObjective={{ 
+                current: recommendations?.monthlyPnLPercent || 0, 
+                target: monthlyTarget 
+              }}
+              weeklyObjective={{ 
+                current: recommendations?.weeklyPnLPercent || 0, 
+                target: weeklyTarget 
+              }}
             />
           )}
 
