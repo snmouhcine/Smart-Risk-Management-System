@@ -321,6 +321,43 @@ const MethodeAlpha = () => {
     };
   };
 
+  // Fonction de validation des données avant envoi à l'IA
+  const validateFinancialData = (data) => {
+    const errors = [];
+    
+    // Vérifications critiques
+    if (!data.currentCapital || data.currentCapital <= 0) {
+      errors.push("Capital actuel invalide");
+    }
+    if (!data.initialCapital || data.initialCapital <= 0) {
+      errors.push("Capital initial invalide");
+    }
+    if (data.tradingDaysLeft === undefined || data.tradingDaysLeft < 0) {
+      errors.push("Jours de trading restants invalides");
+    }
+    if (data.winRate < 0 || data.winRate > 100) {
+      errors.push("Win rate invalide");
+    }
+    if (data.adjustedRiskPercent < 0 || data.adjustedRiskPercent > 100) {
+      errors.push("Pourcentage de risque invalide");
+    }
+    
+    // Log de validation pour transparence
+    console.log("=== VALIDATION DES DONNÉES FINANCIÈRES ===");
+    console.log("Capital actuel:", data.currentCapital);
+    console.log("Jours ouvrables restants:", data.tradingDaysLeft);
+    console.log("Win Rate:", data.winRate);
+    console.log("Risque ajusté:", data.adjustedRiskPercent);
+    console.log("Trades récents:", data.recentTrades?.length || 0);
+    console.log("==========================================");
+    
+    if (errors.length > 0) {
+      throw new Error(`Données invalides: ${errors.join(", ")}`);
+    }
+    
+    return true;
+  };
+
   // NOUVEAU : Analyse IA comme Directeur Financier
   const performFinancialDirectorAnalysis = async () => {
     setIsAnalyzing(true);
@@ -336,6 +373,7 @@ const MethodeAlpha = () => {
       // Calculs KPIs temps réel
       const today = new Date();
       const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+      const businessDaysLeft = getBusinessDaysLeft(today);
       const currentMonthlyReturn = ((currentBalanceNum - initialCapitalNum) / initialCapitalNum) * 100;
       const requiredGainToTarget = ((monthlyTarget - currentMonthlyReturn) / 100) * initialCapitalNum;
       
@@ -375,7 +413,8 @@ const MethodeAlpha = () => {
         
         // Temporal Analysis
         daysLeftInMonth: daysLeftInMonth,
-        tradingDaysLeft: Math.floor(daysLeftInMonth * 0.71), // Environ 5/7 jours sont trading
+        tradingDaysLeft: businessDaysLeft, // Jours ouvrables réels calculés
+        todayDate: today.toISOString().split('T')[0],
         
         // Risk Metrics
         currentDrawdown: drawdown?.drawdownPercent || 0,
@@ -392,12 +431,41 @@ const MethodeAlpha = () => {
         avgLoss: stats.avgLoss,
         consecutiveLosses: stats.consecutiveLosses,
         totalTrades: stats.totalTrades,
+        winningTrades: stats.winningTrades,
+        losingTrades: stats.losingTrades,
+        totalPnL: stats.totalPnL,
+        
+        // Trading Journal Summary
+        recentTrades: Object.entries(tradingJournal)
+          .filter(([_, data]) => data.hasTraded)
+          .sort(([a], [b]) => new Date(b) - new Date(a))
+          .slice(0, 10)
+          .map(([date, data]) => ({
+            date,
+            pnl: parseFloat(data.pnl),
+            notes: data.notes
+          })),
+        
+        // Monthly & Weekly Progress
+        monthlyProgress: smartRec?.monthlyPnLPercent || 0,
+        weeklyProgress: smartRec?.weeklyPnLPercent || 0,
+        monthlyPnL: smartRec?.monthlyPnL || 0,
+        weeklyPnL: smartRec?.weeklyPnL || 0,
         
         // Market Context
         volatilityLevel: stats.consecutiveLosses >= 2 ? "HIGH" : stats.winRate >= 60 ? "LOW" : "MEDIUM",
         tradingEfficiency: stats.totalTrades > 0 ? (stats.winningTrades / stats.totalTrades) : 0,
-        protectionLevel: drawdown?.protectionLevel || 'safe'
+        protectionLevel: drawdown?.protectionLevel || 'safe',
+        
+        // Configured Targets
+        weeklyTargetPercent: weeklyTarget,
+        monthlyTargetPercent: monthlyTarget,
+        dailyLossMaxPercent: dailyLossMax,
+        riskPerTradePercent: riskPerTrade
       };
+
+      // Valider les données avant envoi
+      validateFinancialData(financialData);
 
       // Vérifier quelle clé API utiliser
       const apiKey = aiProvider === 'anthropic' ? anthropicApiKey : openaiApiKey;
@@ -408,20 +476,34 @@ const MethodeAlpha = () => {
 
       const messages = [{
         role: "user",
-        content: `Tu es un DIRECTEUR FINANCIER expert des marchés. Analyse ces données et fournis des KPIs DECISIONNELS pour un trader professionnel.
+        content: `Tu es un DIRECTEUR FINANCIER expert des marchés. Analyse ces données RÉELLES et fournis des KPIs DECISIONNELS pour un trader professionnel.
 
-DONNÉES FINANCIÈRES:
+⚠️ IMPORTANT: Ces données sont RÉELLES issues du journal de trading. Tes recommandations impactent directement les décisions financières. Sois PRÉCIS et PRUDENT.
+
+DONNÉES FINANCIÈRES RÉELLES (Date: ${today.toISOString().split('T')[0]}):
 ${JSON.stringify(financialData, null, 2)}
 
-CONTEXTE CRITIQUE:
-- ${monthlyObjectiveAchieved ? "🏆 OBJECTIF MENSUEL DÉJÀ ATTEINT - MODE PROTECTION CAPITAL OBLIGATOIRE" : "Objectif mensuel en cours"}
-- ${smartRec?.status === 'weekly_achieved' ? "✅ Objectif hebdomadaire atteint" : "Objectif hebdomadaire en cours"}
-- Protection drawdown: ${drawdown?.protectionLevel || 'normale'}
+VALIDATION DES DONNÉES:
+- Capital actuel: $${currentBalanceNum.toFixed(2)}
+- P&L Total: $${stats.totalPnL.toFixed(2)}
+- Nombre de trades: ${stats.totalTrades}
+- Win Rate réel: ${stats.winRate.toFixed(1)}%
+- Jours ouvrables restants ce mois: ${businessDaysLeft}
 
-RÈGLES ABSOLUES:
+CONTEXTE CRITIQUE:
+- ${monthlyObjectiveAchieved ? "🏆 OBJECTIF MENSUEL DÉJÀ ATTEINT - MODE PROTECTION CAPITAL OBLIGATOIRE" : `Objectif mensuel en cours: ${currentMonthlyReturn.toFixed(2)}% / ${monthlyTarget}%`}
+- ${smartRec?.status === 'weekly_achieved' ? "✅ Objectif hebdomadaire atteint" : `Objectif hebdo: ${smartRec?.weeklyPnLPercent?.toFixed(2) || 0}% / ${weeklyTarget}%`}
+- Protection drawdown: ${drawdown?.protectionLevel || 'normale'} (${drawdown?.drawdownPercent?.toFixed(2) || 0}%)
+
+RÈGLES ABSOLUES POUR TES CALCULS:
 1. Si objectif mensuel atteint → Risque MAX 0.2% et perte journalière MAX 0.5%
 2. Si drawdown critique → Mode survie avec risque minimal
 3. Toujours privilégier la protection du capital acquis
+4. Pour "tradesLeftBudget": DOIT être = Math.floor(maxDailyLoss / currentRiskPerTrade)
+5. Pour "daysToTarget": DOIT être = tradingDaysLeft (${businessDaysLeft} jours)
+6. Pour "capitalAtRisk": DOIT être = adjustedRiskPercent (${adjustedRiskPercent.toFixed(2)}%)
+7. Pour "winRateRequired": Calculer basé sur les vraies moyennes de gains/pertes
+8. Base TOUTES tes recommandations sur l'historique réel des trades
 
 Réponds UNIQUEMENT avec un JSON valide dans ce format exact:
 {
@@ -504,10 +586,45 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       const currentBalanceNum = calculatedBalance || parseFloat(currentBalance);
       const today = new Date();
       const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
+      const businessDaysLeft = getBusinessDaysLeft(today);
       const currentReturn = ((currentBalanceNum - parseFloat(initialCapital)) / parseFloat(initialCapital)) * 100;
       const requiredGain = ((monthlyTarget - currentReturn) / 100) * parseFloat(initialCapital);
       const drawdown = calculateDrawdownProtection();
       const stats = getJournalStats();
+      
+      // Calcul des valeurs ajustées selon le contexte
+      let adjustedRiskPercent = riskPerTrade;
+      let adjustedMaxDailyLoss = dailyLossMax;
+      
+      if (currentReturn >= monthlyTarget) {
+        adjustedRiskPercent = 0.2;
+        adjustedMaxDailyLoss = 0.5;
+      } else if (drawdown?.protectionLevel === 'emergency') {
+        adjustedRiskPercent = 0.2;
+        adjustedMaxDailyLoss = 1;
+      } else if (drawdown?.protectionLevel === 'danger') {
+        adjustedRiskPercent = riskPerTrade * 0.3;
+        adjustedMaxDailyLoss = dailyLossMax * 0.5;
+      }
+      
+      const maxLossAmount = currentBalanceNum * (adjustedMaxDailyLoss / 100);
+      const riskPerTradeAmount = currentBalanceNum * (adjustedRiskPercent / 100);
+      const tradesLeftToday = riskPerTradeAmount > 0 ? Math.floor(maxLossAmount / riskPerTradeAmount) : 0;
+      
+      // Calcul du win rate requis
+      const avgTradesPerDay = stats.totalTrades > 0 ? stats.totalTrades / Math.max(1, Object.keys(tradingJournal).length) : 2;
+      const estimatedTradesLeft = businessDaysLeft * avgTradesPerDay;
+      const winRateNeeded = calculateRequiredWinRate(requiredGain, stats.avgWin, stats.avgLoss, estimatedTradesLeft);
+      
+      // Log des calculs pour transparence
+      console.log("=== CALCULS KPI LOCAUX (FALLBACK) ===");
+      console.log("Perte max journalière:", maxLossAmount.toFixed(2));
+      console.log("Risque par trade:", riskPerTradeAmount.toFixed(2));
+      console.log("Trades restants aujourd'hui:", tradesLeftToday);
+      console.log("Jours ouvrables restants:", businessDaysLeft);
+      console.log("Win rate requis:", winRateNeeded.toFixed(1) + "%");
+      console.log("Capital à risque:", adjustedRiskPercent.toFixed(1) + "%");
+      console.log("=====================================");
       
       setAiAnalysis({
         executiveSummary: {
@@ -516,20 +633,20 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
                   currentReturn >= monthlyTarget ? "SAFE" : "CAUTION",
           headline: error.message.includes('API') ? 
             "❌ Analyse IA indisponible - KPIs calculés localement" : 
-            `Capital: ${currentBalanceNum.toFixed(2)} | Objectif: ${currentReturn >= 0 ? 'En cours' : 'À rattraper'}`,
+            `Capital: $${currentBalanceNum.toFixed(2)} | Objectif: ${currentReturn >= 0 ? 'En cours' : 'À rattraper'}`,
           priority: drawdown?.protectionLevel === 'emergency' ? "ARRÊT IMMÉDIAT DU TRADING" :
                    stats.consecutiveLosses >= 3 ? "PAUSE ET ANALYSE REQUISE" :
                    "CONTINUER SELON PLAN"
         },
         kpis: {
-          maxLossToday: `${(currentBalanceNum * dailyLossMax / 100).toFixed(2)}`,
-          optimalRiskPerTrade: `${(currentBalanceNum * riskPerTrade / 100).toFixed(2)}`,
-          minDailyGainRequired: daysLeftInMonth > 0 ? `${(requiredGain / daysLeftInMonth).toFixed(2)}` : "$0",
-          drawdownStatus: drawdown?.protectionLevel || "OK",
-          tradesLeftBudget: Math.floor((currentBalanceNum * dailyLossMax / 100) / (currentBalanceNum * riskPerTrade / 100)),
-          daysToTarget: daysLeftInMonth,
-          winRateRequired: "Calcul indisponible (IA offline)",
-          capitalAtRisk: `${((currentBalanceNum * riskPerTrade / 100) / currentBalanceNum * 100).toFixed(1)}%`
+          maxLossToday: `$${maxLossAmount.toFixed(2)}`,
+          optimalRiskPerTrade: `$${riskPerTradeAmount.toFixed(2)}`,
+          minDailyGainRequired: businessDaysLeft > 0 ? `$${(requiredGain / businessDaysLeft).toFixed(2)}` : "$0",
+          drawdownStatus: drawdown?.protectionLevel?.toUpperCase() || "OK",
+          tradesLeftBudget: `${tradesLeftToday} (ajusté)`,
+          daysToTarget: `${businessDaysLeft} jours ouvrables`,
+          winRateRequired: `${winRateNeeded.toFixed(1)}%`,
+          capitalAtRisk: `${adjustedRiskPercent.toFixed(1)}%`
         },
         financialDirectives: [
           "Vérifiez votre clé API Anthropic pour l'analyse complète",
@@ -556,6 +673,45 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Fonction pour calculer les jours ouvrables restants
+  const getBusinessDaysLeft = (date) => {
+    const today = new Date(date);
+    today.setHours(0, 0, 0, 0); // Normaliser à minuit
+    
+    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    endOfMonth.setHours(23, 59, 59, 999); // Inclure toute la dernière journée
+    
+    let businessDays = 0;
+    
+    // Commencer à partir d'aujourd'hui pour inclure aujourd'hui si c'est un jour ouvrable
+    const currentDate = new Date(today);
+    
+    while (currentDate <= endOfMonth) {
+      const dayOfWeek = currentDate.getDay();
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) { // Exclure dimanche (0) et samedi (6)
+        businessDays++;
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+    
+    // Si on a déjà tradé aujourd'hui, retirer 1 jour
+    const todayKey = getDateKey(today.getFullYear(), today.getMonth(), today.getDate());
+    const todayTraded = tradingJournal[todayKey]?.hasTraded;
+    
+    return todayTraded ? businessDays - 1 : businessDays;
+  };
+
+  // Fonction pour calculer le win rate requis
+  const calculateRequiredWinRate = (remainingGain, avgWin, avgLoss, tradesLeft) => {
+    if (!avgWin || !avgLoss || tradesLeft <= 0) return 0;
+    
+    // Pour atteindre l'objectif: W * avgWin - L * avgLoss >= remainingGain
+    // Où W + L = tradesLeft
+    // Win Rate = W / tradesLeft
+    const winRateNeeded = (remainingGain + tradesLeft * avgLoss) / (tradesLeft * (avgWin + avgLoss));
+    return Math.max(0, Math.min(100, winRateNeeded * 100));
   };
 
   // Fonctions existantes pour le calendrier

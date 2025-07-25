@@ -68,29 +68,81 @@ const DirecteurIA = ({
     return Math.min(100, Math.max(0, danger));
   };
 
-  // Calcul de l'opportunité basé sur les vraies données
+  // Calcul de l'opportunité basé sur les conditions de trading
   const calculateOpportunity = () => {
-    let opportunity = 50; // Base neutre
-
-    // Win rate élevé
-    if (realStats.winRate > 60) opportunity += 20;
-    else if (realStats.winRate > 50) opportunity += 10;
-
+    let opportunity = 0; // Base à 0
+    
+    // 1. Conditions psychologiques (40 points max)
+    // État mental basé sur les pertes consécutives
+    if (realStats.consecutiveLosses === 0) {
+      opportunity += 20; // Excellent état mental
+    } else if (realStats.consecutiveLosses === 1) {
+      opportunity += 10; // État mental correct
+    } else if (realStats.consecutiveLosses >= 3) {
+      opportunity -= 10; // État mental dégradé
+    }
+    
+    // Discipline (pas d'overtrading)
+    const today = new Date();
+    const todayTrades = journalData ? Object.entries(journalData).filter(([dateKey, entry]) => {
+      const entryDate = new Date(dateKey);
+      return entryDate.toDateString() === today.toDateString() && entry.hasTraded;
+    }).length : 0;
+    
+    if (todayTrades <= 2) {
+      opportunity += 20; // Très discipliné
+    } else if (todayTrades <= 4) {
+      opportunity += 10; // Discipliné
+    } else {
+      opportunity -= 10; // Overtrading
+    }
+    
+    // 2. Performance technique (30 points max)
+    // Win rate récent
+    if (realStats.winRate >= 60) {
+      opportunity += 15; // Excellente précision
+    } else if (realStats.winRate >= 50) {
+      opportunity += 10; // Bonne précision
+    } else if (realStats.winRate < 40) {
+      opportunity -= 5; // Précision faible
+    }
+    
     // Profit factor
-    if (realStats.profitFactor > 2) opportunity += 20;
-    else if (realStats.profitFactor > 1.5) opportunity += 10;
-
-    // Gains consécutifs
-    if (realStats.consecutiveWins >= 3) opportunity += 15;
-    else if (realStats.consecutiveWins >= 2) opportunity += 10;
-
-    // Performance mensuelle
+    if (realStats.profitFactor >= 2) {
+      opportunity += 15; // Excellent ratio
+    } else if (realStats.profitFactor >= 1.5) {
+      opportunity += 10; // Bon ratio
+    } else if (realStats.profitFactor < 1) {
+      opportunity -= 5; // Ratio négatif
+    }
+    
+    // 3. Protection du capital (30 points max)
+    // Objectifs atteints
     const monthProgress = monthlyObjective?.current || 0;
     const monthTarget = monthlyObjective?.target || 8;
-    if (monthProgress > monthTarget) opportunity += 15;
-    else if (monthProgress > monthTarget * 0.5) opportunity += 10;
-
-    return Math.min(100, Math.max(0, opportunity));
+    const weekProgress = weeklyObjective?.current || 0;
+    const weekTarget = weeklyObjective?.target || 2;
+    
+    if (monthProgress >= monthTarget) {
+      opportunity += 15; // Objectif mensuel atteint - Mode protection
+    } else if (weekProgress >= weekTarget) {
+      opportunity += 10; // Objectif hebdo atteint - Prudence
+    }
+    
+    // Niveau de drawdown
+    const currentDrawdown = realCapital > 0 ? ((realCapital - (realCapital + realStats.totalPnL)) / realCapital) * 100 : 0;
+    if (currentDrawdown <= 2) {
+      opportunity += 15; // Capital bien protégé
+    } else if (currentDrawdown <= 5) {
+      opportunity += 5; // Capital sous contrôle
+    } else if (currentDrawdown > 8) {
+      opportunity -= 20; // Drawdown critique
+    }
+    
+    // Normaliser entre 0 et 100
+    opportunity = Math.max(0, Math.min(100, opportunity + 50)); // +50 pour centrer à 50%
+    
+    return opportunity;
   };
 
   // Détection des patterns basée sur les vraies données
@@ -187,8 +239,31 @@ const DirecteurIA = ({
       description: "🎯 Cette jauge mesure votre niveau de risque actuel basé sur :\n\n• **Drawdown** : Perte depuis votre pic de capital\n• **Pertes consécutives** : Impact psychologique des pertes\n• **Win rate** : Taux de réussite actuel\n• **Overtrading** : Nombre de trades aujourd'hui\n\n📊 **Interprétation** :\n• 0-30% (VERT) : Zone sûre, tradez normalement\n• 30-60% (JAUNE) : Prudence requise, réduisez les positions\n• 60-100% (ROUGE) : Danger critique, envisagez une pause"
     },
     opportunity: {
-      title: "Opportunité Marché",
-      description: "📈 Cette jauge évalue vos chances de succès basées sur :\n\n• **Performance actuelle** : Win rate et profit factor\n• **Momentum** : Gains consécutifs\n• **Progression objectifs** : Vs. cibles mensuelles\n• **Conditions marché** : Volatilité et tendances\n\n💡 **Interprétation** :\n• 0-40% (GRIS) : Conditions défavorables, soyez sélectif\n• 40-70% (BLEU) : Conditions neutres, trading normal\n• 70-100% (VERT) : Conditions favorables, saisissez les opportunités"
+      title: "Conditions de Trading",
+      description: `📊 Cette jauge évalue si les CONDITIONS sont favorables pour trader, basé sur 3 critères clés :
+
+**1. État Psychologique (40%)** :
+• Pertes consécutives (impact mental)
+• Discipline (nombre de trades aujourd'hui)
+• Patterns comportementaux
+
+**2. Performance Technique (30%)** :
+• Win rate actuel
+• Profit factor (ratio gains/pertes)
+• Momentum de trading
+
+**3. Protection du Capital (30%)** :
+• Niveau de drawdown
+• Objectifs atteints (hebdo/mensuel)
+• Exposition au risque
+
+📈 **Comment l'utiliser** :
+• **80-100% (EXCELLENTES)** : Toutes les conditions sont réunies, tradez normalement
+• **60-80% (FAVORABLES)** : Bonnes conditions, restez discipliné
+• **40-60% (MOYENNES)** : Prudence requise, soyez très sélectif
+• **0-40% (DÉFAVORABLES)** : Arrêtez ou réduisez drastiquement
+
+⚠️ Cette jauge ne prédit PAS la direction du marché, elle évalue si VOUS êtes dans de bonnes conditions pour trader efficacement.`
     },
     timing: {
       title: "Timing Marché Paris",
@@ -276,7 +351,7 @@ const DirecteurIA = ({
 
         {/* Tableau de bord principal - 3 jauges avec meilleur agencement */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Jauge de Danger */}
+          {/* Jauge de Danger - Design amélioré */}
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700 flex items-center">
@@ -291,60 +366,59 @@ const DirecteurIA = ({
                 <HelpCircle className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            <div className="relative h-40">
-              <svg className="w-full h-full" viewBox="0 0 200 120">
-                {/* Arc de fond */}
-                <path
-                  d="M 30 90 A 60 60 0 0 1 170 90"
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeWidth="20"
-                />
-                {/* Arc de progression */}
-                <path
-                  d="M 30 90 A 60 60 0 0 1 170 90"
-                  fill="none"
-                  stroke={dangerLevel > 60 ? '#ef4444' : dangerLevel > 30 ? '#f59e0b' : '#10b981'}
-                  strokeWidth="20"
-                  strokeDasharray={`${dangerLevel * 1.41} 141`}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                {/* Centre du cadran */}
-                <circle cx="100" cy="90" r="8" fill="#1e293b" />
-                {/* Aiguille */}
-                <line
-                  x1="100"
-                  y1="90"
-                  x2={100 + Math.cos((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
-                  y2={90 + Math.sin((Math.PI - (dangerLevel * Math.PI / 100))) * 50}
-                  stroke="#1e293b"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                {/* Marqueurs */}
-                <text x="30" y="100" className="fill-slate-400 text-xs">0</text>
-                <text x="100" y="25" className="fill-slate-400 text-xs" textAnchor="middle">50</text>
-                <text x="170" y="100" className="fill-slate-400 text-xs" textAnchor="end">100</text>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center mt-12">
-                  <div className="text-4xl font-bold text-slate-900">{dangerLevel}%</div>
-                  <div className={`text-sm font-medium mt-1 ${dangerLevel > 60 ? 'text-red-600' : dangerLevel > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
-                    {dangerLevel > 60 ? 'CRITIQUE' : dangerLevel > 30 ? 'ATTENTION' : 'SAFE'}
+            <div className="space-y-4">
+              {/* Valeur principale */}
+              <div className="text-center">
+                <div className="text-5xl font-bold text-slate-900">{dangerLevel}%</div>
+                <div className={`text-sm font-medium mt-1 ${dangerLevel > 60 ? 'text-red-600' : dangerLevel > 30 ? 'text-yellow-600' : 'text-green-600'}`}>
+                  {dangerLevel > 60 ? 'CRITIQUE' : dangerLevel > 30 ? 'ATTENTION' : 'SAFE'}
+                </div>
+              </div>
+              
+              {/* Barre de progression */}
+              <div className="relative">
+                <div className="h-6 bg-gradient-to-r from-green-100 via-yellow-100 to-red-100 rounded-full overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-between px-2">
+                    <span className="text-[10px] font-medium text-green-700">0</span>
+                    <span className="text-[10px] font-medium text-yellow-700">50</span>
+                    <span className="text-[10px] font-medium text-red-700">100</span>
                   </div>
+                </div>
+                <div 
+                  className="absolute top-0 left-0 h-6 rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${dangerLevel}%`,
+                    background: dangerLevel > 60 ? '#ef4444' : dangerLevel > 30 ? '#f59e0b' : '#10b981'
+                  }}
+                />
+                {/* Indicateur */}
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 w-1 h-8 bg-slate-900 rounded-full transition-all duration-1000"
+                  style={{ left: `${dangerLevel}%`, marginLeft: '-2px' }}
+                />
+              </div>
+              
+              {/* Zones de danger */}
+              <div className="grid grid-cols-3 gap-2 text-[11px]">
+                <div className={`text-center py-1 px-2 rounded ${dangerLevel <= 30 ? 'bg-green-100 text-green-700 font-semibold' : 'text-slate-400'}`}>
+                  Zone Safe
+                </div>
+                <div className={`text-center py-1 px-2 rounded ${dangerLevel > 30 && dangerLevel <= 60 ? 'bg-yellow-100 text-yellow-700 font-semibold' : 'text-slate-400'}`}>
+                  Prudence
+                </div>
+                <div className={`text-center py-1 px-2 rounded ${dangerLevel > 60 ? 'bg-red-100 text-red-700 font-semibold' : 'text-slate-400'}`}>
+                  Danger
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Jauge d'Opportunité */}
+          {/* Jauge de Conditions de Trading - Design amélioré */}
           <div className="bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-sm font-semibold text-slate-700 flex items-center">
-                <TrendingUp className="w-4 h-4 mr-2 text-green-500" />
-                OPPORTUNITÉ MARCHÉ
+                <Activity className="w-4 h-4 mr-2 text-blue-500" />
+                CONDITIONS DE TRADING
               </h3>
               <button
                 onClick={() => showInfo('opportunity', 'cockpit')}
@@ -354,45 +428,61 @@ const DirecteurIA = ({
                 <HelpCircle className="w-4 h-4 text-slate-400" />
               </button>
             </div>
-            <div className="relative h-40">
-              <svg className="w-full h-full" viewBox="0 0 200 120">
-                <path
-                  d="M 30 90 A 60 60 0 0 1 170 90"
-                  fill="none"
-                  stroke="#e2e8f0"
-                  strokeWidth="20"
-                />
-                <path
-                  d="M 30 90 A 60 60 0 0 1 170 90"
-                  fill="none"
-                  stroke={opportunityLevel > 70 ? '#10b981' : opportunityLevel > 40 ? '#3b82f6' : '#6b7280'}
-                  strokeWidth="20"
-                  strokeDasharray={`${opportunityLevel * 1.41} 141`}
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                <circle cx="100" cy="90" r="8" fill="#1e293b" />
-                <line
-                  x1="100"
-                  y1="90"
-                  x2={100 + Math.cos((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
-                  y2={90 + Math.sin((Math.PI - (opportunityLevel * Math.PI / 100))) * 50}
-                  stroke="#1e293b"
-                  strokeWidth="4"
-                  strokeLinecap="round"
-                  className="transition-all duration-1000"
-                />
-                <text x="30" y="100" className="fill-slate-400 text-xs">0</text>
-                <text x="100" y="25" className="fill-slate-400 text-xs" textAnchor="middle">50</text>
-                <text x="170" y="100" className="fill-slate-400 text-xs" textAnchor="end">100</text>
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center mt-12">
-                  <div className="text-4xl font-bold text-slate-900">{opportunityLevel}%</div>
-                  <div className={`text-sm font-medium mt-1 ${opportunityLevel > 70 ? 'text-green-600' : opportunityLevel > 40 ? 'text-blue-600' : 'text-gray-600'}`}>
-                    {opportunityLevel > 70 ? 'BULLISH' : opportunityLevel > 40 ? 'NEUTRE' : 'BEARISH'}
+            <div className="space-y-4">
+              {/* Valeur principale */}
+              <div className="text-center">
+                <div className="text-5xl font-bold text-slate-900">{opportunityLevel}%</div>
+                <div className={`text-sm font-medium mt-1 ${
+                  opportunityLevel >= 80 ? 'text-green-600' : 
+                  opportunityLevel >= 60 ? 'text-blue-600' : 
+                  opportunityLevel >= 40 ? 'text-yellow-600' : 
+                  'text-red-600'
+                }`}>
+                  {opportunityLevel >= 80 ? 'EXCELLENTES' : 
+                   opportunityLevel >= 60 ? 'FAVORABLES' : 
+                   opportunityLevel >= 40 ? 'MOYENNES' : 
+                   'DÉFAVORABLES'}
+                </div>
+              </div>
+              
+              {/* Barre de progression */}
+              <div className="relative">
+                <div className="h-6 bg-gradient-to-r from-red-100 via-yellow-100 via-blue-100 to-green-100 rounded-full overflow-hidden">
+                  <div className="absolute inset-0 flex items-center justify-between px-2">
+                    <span className="text-[10px] font-medium text-red-700">0</span>
+                    <span className="text-[10px] font-medium text-yellow-700">40</span>
+                    <span className="text-[10px] font-medium text-blue-700">60</span>
+                    <span className="text-[10px] font-medium text-green-700">80</span>
                   </div>
                 </div>
+                <div 
+                  className="absolute top-0 left-0 h-6 rounded-full transition-all duration-1000"
+                  style={{
+                    width: `${opportunityLevel}%`,
+                    background: opportunityLevel >= 80 ? '#10b981' : 
+                               opportunityLevel >= 60 ? '#3b82f6' : 
+                               opportunityLevel >= 40 ? '#f59e0b' : 
+                               '#ef4444'
+                  }}
+                />
+                {/* Indicateur */}
+                <div 
+                  className="absolute top-1/2 -translate-y-1/2 w-1 h-8 bg-slate-900 rounded-full transition-all duration-1000"
+                  style={{ left: `${opportunityLevel}%`, marginLeft: '-2px' }}
+                />
+              </div>
+              
+              {/* Recommandations selon les conditions */}
+              <div className="text-center text-[11px] p-2 rounded bg-white/50">
+                {opportunityLevel >= 80 ? (
+                  <span className="text-green-700 font-semibold">✅ Tradez avec confiance - Conditions optimales</span>
+                ) : opportunityLevel >= 60 ? (
+                  <span className="text-blue-700 font-semibold">👍 Tradez normalement - Restez discipliné</span>
+                ) : opportunityLevel >= 40 ? (
+                  <span className="text-yellow-700 font-semibold">⚠️ Soyez sélectif - Réduisez la taille</span>
+                ) : (
+                  <span className="text-red-700 font-semibold">🛑 Évitez de trader - Conditions difficiles</span>
+                )}
               </div>
             </div>
           </div>
