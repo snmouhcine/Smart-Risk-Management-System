@@ -114,6 +114,30 @@ const MethodeAlpha = () => {
     }
   };
 
+  // Fonction pour sauvegarder tous les paramètres en une fois
+  const saveAllSettings = async () => {
+    try {
+      const allSettings = {
+        initial_capital: parseFloat(initialCapital) || 0,
+        current_balance: parseFloat(currentBalance) || 0,
+        risk_per_trade: riskPerTrade,
+        daily_loss_max: dailyLossMax,
+        weekly_target: weeklyTarget,
+        monthly_target: monthlyTarget,
+        secure_mode: secureMode,
+        ai_provider: aiProvider,
+        selected_model: selectedModel,
+        anthropic_api_key: anthropicApiKey,
+        openai_api_key: openaiApiKey
+      };
+      await saveSettings(allSettings);
+      return true;
+    } catch (error) {
+      console.error('Erreur sauvegarde paramètres:', error);
+      throw error;
+    }
+  };
+
   // Fonctions wrapped pour auto-sauvegarde
   const setInitialCapitalWithSave = (value) => {
     setInitialCapital(value);
@@ -1270,6 +1294,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               setOpenaiApiKey={setOpenaiApiKeyWithSave}
               selectedModel={selectedModel}
               setSelectedModel={setSelectedModelWithSave}
+              saveAllSettings={saveAllSettings}
             />
           )}
         </div>
