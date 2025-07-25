@@ -24,6 +24,8 @@ const MethodeAlpha = () => {
     tradingJournal, 
     saveSettings, 
     saveJournalEntry,
+    deleteJournalEntry,
+    deleteAllJournalEntries,
     saveAIAnalysis,
     isDataLoaded 
   } = useSupabaseData();
@@ -781,6 +783,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     }
   };
 
+
   // Stats du journal
   const getJournalStats = () => {
     const entries = Object.values(tradingJournal).filter(day => day.hasTraded);
@@ -1242,6 +1245,8 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               getFirstDayOfMonth={getFirstDayOfMonth}
               getDateKey={getDateKey}
               getDayStatus={getDayStatus}
+              deleteJournalEntry={deleteJournalEntry}
+              deleteAllJournalEntries={deleteAllJournalEntries}
             />
           )}
 

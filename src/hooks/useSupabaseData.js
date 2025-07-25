@@ -127,6 +127,25 @@ export const useSupabaseData = () => {
       throw err
     }
   }
+  
+  // Supprimer toutes les entrées du journal
+  const deleteAllJournalEntries = async () => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression de toutes les entrées du journal...')
+      await DataService.deleteAllTradingJournalEntries(user.id)
+      
+      // Mettre à jour l'état local
+      setTradingJournal({})
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur suppression globale journal:', err)
+      setError(err)
+      throw err
+    }
+  }
 
   // Sauvegarder une analyse IA
   const saveAIAnalysis = async (analysisData, modelUsed, provider) => {
@@ -184,6 +203,7 @@ export const useSupabaseData = () => {
     saveSettings,
     saveJournalEntry,
     deleteJournalEntry,
+    deleteAllJournalEntries,
     saveAIAnalysis,
     savePositionCalculation,
     

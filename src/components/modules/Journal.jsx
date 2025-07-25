@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Calendar, AlertTriangle, BarChart3, X, ChevronLeft, ChevronRight, RotateCcw } from 'lucide-react';
+import { Calendar, AlertTriangle, BarChart3, X, ChevronLeft, ChevronRight, RotateCcw, Trash2 } from 'lucide-react';
 import { formatCurrency, formatNumber, parseNumberInput } from '../../utils/formatters';
 
 const Journal = ({
@@ -16,12 +16,18 @@ const Journal = ({
   getDaysInMonth,
   getFirstDayOfMonth,
   getDateKey,
-  getDayStatus
+  getDayStatus,
+  deleteJournalEntry,
+  deleteAllJournalEntries
 }) => {
   const today = new Date();
   
   // État pour la navigation dans l'historique
   const [viewDate, setViewDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  
+  // État pour les confirmations de suppression
+  const [showDeleteAllConfirm, setShowDeleteAllConfirm] = useState(false);
+  const [dayToDelete, setDayToDelete] = useState(null);
   
   const currentMonth = viewDate.getMonth();
   const currentYear = viewDate.getFullYear();
@@ -139,20 +145,34 @@ const Journal = ({
               </div>
             </div>
 
-            {/* Légende */}
-            <div className="flex items-center space-x-4 text-sm">
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-green-500 rounded"></div>
-                <span className="text-slate-600">Gain</span>
+            {/* Légende et bouton de suppression globale */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4 text-sm">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded"></div>
+                  <span className="text-slate-600">Gain</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-red-500 rounded"></div>
+                  <span className="text-slate-600">Perte</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-slate-300 rounded"></div>
+                  <span className="text-slate-600">No Trade</span>
+                </div>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-red-500 rounded"></div>
-                <span className="text-slate-600">Perte</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 bg-slate-300 rounded"></div>
-                <span className="text-slate-600">No Trade</span>
-              </div>
+              
+              {/* Bouton suppression globale */}
+              {Object.keys(tradingJournal).length > 0 && (
+                <button
+                  onClick={() => setShowDeleteAllConfirm(true)}
+                  className="flex items-center space-x-2 px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  title="Supprimer tous les trades"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Tout effacer</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -379,19 +399,116 @@ const Journal = ({
               </div>
 
               <div className="flex space-x-3 pt-4">
-                <button
-                  onClick={() => setShowDayModal(false)}
-                  className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
-                >
-                  Annuler
-                </button>
-                <button
-                  onClick={saveDayData}
-                  className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg font-medium"
-                >
-                  Sauvegarder
-                </button>
+                {/* Bouton supprimer si le jour a des données */}
+                {tradingJournal[selectedDate.dateKey] && (
+                  <button
+                    onClick={() => {
+                      setDayToDelete(selectedDate.dateKey);
+                      setShowDayModal(false);
+                    }}
+                    className="px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium flex items-center"
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Supprimer
+                  </button>
+                )}
+                
+                <div className="flex-1 flex space-x-3">
+                  <button
+                    onClick={() => setShowDayModal(false)}
+                    className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+                  >
+                    Annuler
+                  </button>
+                  <button
+                    onClick={saveDayData}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg font-medium"
+                  >
+                    Sauvegarder
+                  </button>
+                </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation pour supprimer un jour */}
+      {dayToDelete && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-900 mb-4">
+              Confirmer la suppression
+            </h3>
+            <p className="text-slate-600 mb-6">
+              Êtes-vous sûr de vouloir supprimer les données de trading de cette journée ?
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setDayToDelete(null)}
+                className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteJournalEntry(dayToDelete);
+                    setDayToDelete(null);
+                  } catch (error) {
+                    console.error('Erreur suppression:', error);
+                  }
+                }}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+              >
+                Supprimer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de confirmation pour tout supprimer */}
+      {showDeleteAllConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl">
+            <h3 className="text-xl font-semibold text-slate-900 mb-4">
+              Supprimer toutes les données
+            </h3>
+            <div className="mb-6 space-y-2">
+              <p className="text-slate-600">
+                Cette action supprimera définitivement TOUTES vos données de trading :
+              </p>
+              <ul className="text-sm text-slate-500 space-y-1 ml-4">
+                <li>• Tous les trades enregistrés</li>
+                <li>• Toutes les notes</li>
+                <li>• Tout l'historique de performance</li>
+              </ul>
+              <p className="text-red-600 font-medium mt-4">
+                Cette action est irréversible !
+              </p>
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => setShowDeleteAllConfirm(false)}
+                className="flex-1 px-4 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteAllJournalEntries();
+                    setShowDeleteAllConfirm(false);
+                  } catch (error) {
+                    console.error('Erreur suppression globale:', error);
+                  }
+                }}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center justify-center"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Tout supprimer
+              </button>
             </div>
           </div>
         </div>

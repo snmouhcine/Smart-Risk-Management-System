@@ -142,6 +142,23 @@ export class DataService {
     }
   }
   
+  // Supprimer toutes les entrées du journal d'un utilisateur
+  static async deleteAllTradingJournalEntries(userId) {
+    try {
+      const { error } = await supabase
+        .from('trading_journal')
+        .delete()
+        .eq('user_id', userId)
+      
+      if (error) throw error
+      
+      console.log('✅ Toutes les entrées du journal supprimées')
+    } catch (error) {
+      console.error('❌ Erreur suppression globale journal:', error)
+      throw error
+    }
+  }
+  
   // === ANALYSES IA ===
   
   // Sauvegarder une analyse IA
