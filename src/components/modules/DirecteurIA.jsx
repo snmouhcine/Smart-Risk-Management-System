@@ -3,7 +3,7 @@ import {
   Brain, Zap, AlertTriangle, Target, TrendingUp, Shield,
   Cpu, LineChart, Lock, DollarSign, Info, X, Activity,
   Gauge, Clock, AlertCircle, CheckCircle, TrendingDown,
-  BarChart3, Radar, HelpCircle
+  BarChart3, Heart, HelpCircle, Timer, CheckCircle2, Shield as ShieldIcon
 } from 'lucide-react';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 
@@ -20,7 +20,8 @@ const DirecteurIA = ({
   capital,
   journalData,
   monthlyObjective,
-  weeklyObjective
+  weeklyObjective,
+  tradingTimezone = 'UTC'
 }) => {
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoContent, setInfoContent] = useState({ title: '', description: '' });
@@ -207,22 +208,25 @@ const DirecteurIA = ({
   const dangerLevel = calculateDangerLevel();
   const opportunityLevel = calculateOpportunity();
 
-  // Déterminer l'état du timing pour Paris (15h30-17h30)
+  // Déterminer l'état du timing basé sur le fuseau horaire configuré (13:30-15:30)
   const getTimingStatus = () => {
     const now = new Date();
-    const hour = now.getHours();
-    const minute = now.getMinutes();
-    const totalMinutes = hour * 60 + minute;
     
-    // Heures de trading Paris
-    const marketOpen = 15 * 60 + 30; // 15h30
-    const marketClose = 17 * 60 + 30; // 17h30
+    // Créer une date dans le fuseau horaire configuré
+    const timeInTimezone = new Date(now.toLocaleString("en-US", {timeZone: tradingTimezone}));
+    const timezoneHour = timeInTimezone.getHours();
+    const timezoneMinute = timeInTimezone.getMinutes();
+    const timezoneTotalMinutes = timezoneHour * 60 + timezoneMinute;
     
-    if (totalMinutes >= marketOpen && totalMinutes <= marketClose) {
+    // Heures de trading dans le fuseau horaire configuré
+    const marketOpen = 13 * 60 + 30; // 13h30
+    const marketClose = 15 * 60 + 30; // 15h30
+    
+    if (timezoneTotalMinutes >= marketOpen && timezoneTotalMinutes <= marketClose) {
       return { status: 'OPTIMAL', color: 'text-green-400', icon: '▲', bg: 'bg-green-500/20' };
-    } else if (totalMinutes >= marketOpen - 30 && totalMinutes < marketOpen) {
+    } else if (timezoneTotalMinutes >= marketOpen - 30 && timezoneTotalMinutes < marketOpen) {
       return { status: 'PRÉPARATION', color: 'text-yellow-400', icon: '●', bg: 'bg-yellow-500/20' };
-    } else if (totalMinutes > marketClose && totalMinutes <= marketClose + 30) {
+    } else if (timezoneTotalMinutes > marketClose && timezoneTotalMinutes <= marketClose + 30) {
       return { status: 'CLÔTURE', color: 'text-orange-400', icon: '▼', bg: 'bg-orange-500/20' };
     } else {
       return { status: 'FERMÉ', color: 'text-red-400', icon: '■', bg: 'bg-red-500/20' };
@@ -230,7 +234,11 @@ const DirecteurIA = ({
   };
 
   const timing = getTimingStatus();
-  const currentTime = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const currentTime = new Date().toLocaleTimeString('fr-FR', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    timeZone: tradingTimezone 
+  });
 
   // Explications pour le cockpit
   const cockpitExplanations = {
@@ -269,9 +277,9 @@ const DirecteurIA = ({
       title: "Timing Marché Paris",
       description: "⏰ Indicateur des heures de trading optimales (15h30-17h30 Paris) :\n\n• **OPTIMAL** (15h30-17h30) : Meilleure liquidité et volatilité\n• **PRÉPARATION** (15h00-15h30) : Préparez vos setups\n• **CLÔTURE** (17h30-18h00) : Fermez les positions\n• **FERMÉ** : Marché fermé, évitez de trader\n\n🌍 **Pourquoi ces heures ?**\n• Chevauchement Europe/USA\n• Volume maximum\n• Mouvements plus prévisibles\n• Spreads réduits"
     },
-    patternRadar: {
-      title: "Pattern Radar Comportemental",
-      description: "🧠 Détection automatique de vos patterns de trading :\n\n**Patterns Négatifs** (à éviter) :\n• **Revenge Trading** : Tentative de récupérer les pertes rapidement\n• **Overtrading** : Trop de trades dans une journée\n• **FOMO** : Trading en dehors des heures optimales\n\n**Patterns Positifs** (à maintenir) :\n• **Discipline** : Respect des règles de trading\n• **Patience** : Attente des bons setups\n\n📊 **Comment lire** :\n• Barres ROUGES sur patterns négatifs = Danger\n• Barres VERTES sur patterns positifs = Bon\n• Objectif : Minimiser les négatifs, maximiser les positifs"
+    tradingHealth: {
+      title: "Santé du Trading",
+      description: "🏥 Évaluation complète de votre santé de trading basée sur 4 piliers :\n\n**1. État Mental** 🧠\n• Basé sur vos pertes consécutives\n• Détecte les patterns de revenge trading\n• 100% = État mental optimal\n\n**2. Discipline Risque** 🛡️\n• Évalue votre profit factor\n• Mesure le respect de vos règles de risk management\n• 100% = Discipline parfaite\n\n**3. Discipline Temps** ⏱️\n• Vérifie si vous tradez aux bonnes heures\n• Détecte le FOMO et l'overtrading\n• 100% = Timing optimal\n\n**4. Santé Globale** ✓\n• Synthèse de tous les indicateurs\n• Recommandations automatiques\n• 70%+ = Continuez | 40-70% = Prudence | <40% = Pause\n\n💡 **Objectif** : Maintenir tous les indicateurs au-dessus de 70% pour un trading optimal et durable."
     }
   };
 
@@ -587,56 +595,206 @@ const DirecteurIA = ({
         </div>
       )}
 
-      {/* Pattern Radar */}
+      {/* Trading Health Dashboard (Replacing Pattern Radar) */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h3 className="text-lg font-bold text-slate-900 flex items-center">
-            <Radar className="w-5 h-5 mr-2 text-purple-600" />
-            PATTERN RADAR
+            <Heart className="w-5 h-5 mr-2 text-purple-600" />
+            SANTÉ DU TRADING
           </h3>
           <button
-            onClick={() => showInfo('patternRadar', 'cockpit')}
+            onClick={() => showInfo('tradingHealth', 'cockpit')}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            title="Comprendre les patterns"
+            title="Comprendre la santé du trading"
           >
             <HelpCircle className="w-4 h-4 text-slate-400" />
           </button>
         </div>
         
-        <div className="space-y-4">
-          {Object.entries(patterns).map(([pattern, value]) => {
-            const isNegative = ['revenge', 'overtrading', 'fomo'].includes(pattern);
-            const color = isNegative 
-              ? value > 60 ? 'bg-red-500' : value > 30 ? 'bg-orange-500' : 'bg-green-500'
-              : value > 60 ? 'bg-green-500' : value > 30 ? 'bg-orange-500' : 'bg-red-500';
-            
-            return (
-              <div key={pattern} className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-slate-700 capitalize">
-                    {pattern.replace(/([A-Z])/g, ' $1').trim()}
-                  </span>
-                  <span className="text-sm font-semibold text-slate-900">{value}%</span>
-                </div>
-                <div className="w-full bg-slate-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${color}`}
-                    style={{ width: `${value}%` }}
-                  />
-                </div>
+        {/* Circular Health Indicators */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {/* Mental State */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="#e5e7eb"
+                  strokeWidth="8"
+                  fill="none"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke={patterns.revenge > 60 ? '#ef4444' : patterns.revenge > 30 ? '#f59e0b' : '#10b981'}
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(100 - patterns.revenge) * 2.51} 251`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Brain className="w-8 h-8 text-purple-600" />
               </div>
-            );
-          })}
+            </div>
+            <div className="mt-2 text-center">
+              <p className="text-xs font-semibold text-slate-700">État Mental</p>
+              <p className={`text-sm font-bold ${
+                patterns.revenge > 60 ? 'text-red-600' : patterns.revenge > 30 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {100 - patterns.revenge}%
+              </p>
+            </div>
+          </div>
+
+          {/* Risk Discipline */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="#e5e7eb"
+                  strokeWidth="8"
+                  fill="none"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke={realStats.profitFactor < 1 ? '#ef4444' : realStats.profitFactor < 1.5 ? '#f59e0b' : '#10b981'}
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${Math.min(100, realStats.profitFactor * 50) * 2.51} 251`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <ShieldIcon className="w-8 h-8 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-center">
+              <p className="text-xs font-semibold text-slate-700">Discipline Risque</p>
+              <p className={`text-sm font-bold ${
+                realStats.profitFactor < 1 ? 'text-red-600' : realStats.profitFactor < 1.5 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {Math.min(100, Math.round(realStats.profitFactor * 50))}%
+              </p>
+            </div>
+          </div>
+
+          {/* Time Discipline */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="#e5e7eb"
+                  strokeWidth="8"
+                  fill="none"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke={patterns.fomo > 60 ? '#ef4444' : patterns.fomo > 30 ? '#f59e0b' : '#10b981'}
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${(100 - patterns.fomo) * 2.51} 251`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Timer className="w-8 h-8 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-center">
+              <p className="text-xs font-semibold text-slate-700">Discipline Temps</p>
+              <p className={`text-sm font-bold ${
+                patterns.fomo > 60 ? 'text-red-600' : patterns.fomo > 30 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {100 - patterns.fomo}%
+              </p>
+            </div>
+          </div>
+
+          {/* Overall Health */}
+          <div className="flex flex-col items-center">
+            <div className="relative w-24 h-24">
+              <svg className="w-full h-full transform -rotate-90">
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke="#e5e7eb"
+                  strokeWidth="8"
+                  fill="none"
+                />
+                <circle
+                  cx="48"
+                  cy="48"
+                  r="40"
+                  stroke={opportunityLevel < 40 ? '#ef4444' : opportunityLevel < 70 ? '#f59e0b' : '#10b981'}
+                  strokeWidth="8"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={`${opportunityLevel * 2.51} 251`}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <CheckCircle2 className="w-8 h-8 text-purple-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-center">
+              <p className="text-xs font-semibold text-slate-700">Santé Globale</p>
+              <p className={`text-sm font-bold ${
+                opportunityLevel < 40 ? 'text-red-600' : opportunityLevel < 70 ? 'text-orange-600' : 'text-green-600'
+              }`}>
+                {opportunityLevel}%
+              </p>
+            </div>
+          </div>
         </div>
 
-        {patterns.revenge > 60 && (
-          <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-800 flex items-center font-medium">
-              <AlertCircle className="w-4 h-4 mr-2" />
-              Pattern de revenge trading détecté! Faites une pause.
-            </p>
-          </div>
-        )}
+        {/* Health Status Message */}
+        <div className={`mt-6 p-4 rounded-lg ${
+          opportunityLevel >= 70 ? 'bg-green-50 border border-green-200' :
+          opportunityLevel >= 40 ? 'bg-yellow-50 border border-yellow-200' :
+          'bg-red-50 border border-red-200'
+        }`}>
+          <p className={`text-sm font-medium flex items-center ${
+            opportunityLevel >= 70 ? 'text-green-800' :
+            opportunityLevel >= 40 ? 'text-yellow-800' :
+            'text-red-800'
+          }`}>
+            {opportunityLevel >= 70 ? (
+              <>
+                <CheckCircle className="w-4 h-4 mr-2" />
+                Excellente santé de trading! Continuez avec discipline.
+              </>
+            ) : opportunityLevel >= 40 ? (
+              <>
+                <AlertCircle className="w-4 h-4 mr-2" />
+                Santé moyenne. Soyez prudent et respectez vos règles.
+              </>
+            ) : (
+              <>
+                <AlertTriangle className="w-4 h-4 mr-2" />
+                Santé critique! Envisagez une pause ou réduisez vos positions.
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {/* Métriques secondaires existantes */}

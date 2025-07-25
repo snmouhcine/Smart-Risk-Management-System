@@ -10,7 +10,8 @@ import {
   User,
   Save,
   Eye,
-  EyeOff
+  EyeOff,
+  Globe
 } from 'lucide-react';
 import { AI_MODELS, testAPIConnection } from '../../utils/aiProviders';
 import { parseNumberInput, formatCurrency } from '../../utils/formatters';
@@ -41,6 +42,8 @@ const SettingsModule = ({
   setOpenaiApiKey,
   selectedModel = 'claude-3-5-sonnet-20241022',
   setSelectedModel,
+  tradingTimezone = 'UTC',
+  setTradingTimezone,
   saveAllSettings
 }) => {
   const { user } = useAuth();
@@ -309,6 +312,33 @@ const SettingsModule = ({
                   >
                     {secureMode ? 'Activé' : 'Désactivé'}
                   </button>
+                </div>
+              </div>
+              
+              {/* Trading Timezone */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <Globe className="w-4 h-4 inline mr-2" />
+                  Fuseau Horaire Trading
+                </label>
+                <select
+                  value={tradingTimezone}
+                  onChange={(e) => setTradingTimezone(e.target.value)}
+                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="UTC">UTC (Temps Universel Coordonné)</option>
+                  <option value="Europe/Paris">Europe/Paris (CET/CEST)</option>
+                  <option value="Europe/London">Europe/London (GMT/BST)</option>
+                  <option value="America/New_York">America/New York (EST/EDT)</option>
+                  <option value="America/Chicago">America/Chicago (CST/CDT)</option>
+                  <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+                  <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+                  <option value="Asia/Dubai">Asia/Dubai (GST)</option>
+                  <option value="Australia/Sydney">Australia/Sydney (AEDT/AEST)</option>
+                  <option value="Africa/Casablanca">Africa/Casablanca (WET)</option>
+                </select>
+                <div className="text-xs text-slate-600 mt-1">
+                  ⏰ Les heures de trading (13:30-15:30) sont définies dans ce fuseau horaire
                 </div>
               </div>
               

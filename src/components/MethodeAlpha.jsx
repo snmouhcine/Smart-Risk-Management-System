@@ -65,6 +65,7 @@ const MethodeAlpha = () => {
   // États spécifiques
   const [recommendations, setRecommendations] = useState(null);
   const [secureMode, setSecureMode] = useState(false);
+  const [tradingTimezone, setTradingTimezone] = useState('UTC');
 
   // États pour le journal
   const [showDayModal, setShowDayModal] = useState(false);
@@ -98,6 +99,7 @@ const MethodeAlpha = () => {
       setWeeklyTarget(userSettings.weekly_target || 2);
       setMonthlyTarget(userSettings.monthly_target || 8);
       setSecureMode(userSettings.secure_mode || false);
+      setTradingTimezone(userSettings.trading_timezone || 'UTC');
       setAiProvider(userSettings.ai_provider || 'anthropic');
       setSelectedModel(userSettings.selected_model || 'claude-3-5-sonnet-20241022');
       setAnthropicApiKey(userSettings.anthropic_api_key || '');
@@ -142,6 +144,7 @@ const MethodeAlpha = () => {
         weekly_target: weeklyTarget,
         monthly_target: monthlyTarget,
         secure_mode: secureMode,
+        trading_timezone: tradingTimezone,
         ai_provider: aiProvider,
         selected_model: selectedModel,
         anthropic_api_key: anthropicApiKey,
@@ -189,6 +192,10 @@ const MethodeAlpha = () => {
   const setSecureModeWithSave = (value) => {
     setSecureMode(value);
     saveUserSettings({ secure_mode: value });
+  };
+  const setTradingTimezoneWithSave = (value) => {
+    setTradingTimezone(value);
+    saveUserSettings({ trading_timezone: value });
   };
 
   const setAiProviderWithSave = (value) => {
@@ -1314,6 +1321,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
                 current: recommendations?.weeklyPnLPercent || 0, 
                 target: weeklyTarget 
               }}
+              tradingTimezone={tradingTimezone}
             />
           )}
 
@@ -1342,6 +1350,8 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               setOpenaiApiKey={setOpenaiApiKeyWithSave}
               selectedModel={selectedModel}
               setSelectedModel={setSelectedModelWithSave}
+              tradingTimezone={tradingTimezone}
+              setTradingTimezone={setTradingTimezoneWithSave}
               saveAllSettings={saveAllSettings}
             />
           )}
