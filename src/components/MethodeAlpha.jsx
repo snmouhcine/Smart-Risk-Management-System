@@ -3,7 +3,7 @@ import {
   Calculator, TrendingUp, AlertTriangle, DollarSign, Target, 
   TrendingDown, Calendar, Brain, Shield, BarChart3, PieChart,
   Settings, Bell, User, Menu, X, Activity, Zap, Eye, Lock, CheckCircle, AlertCircle,
-  Cpu, Bot, LineChart, Flame, Skull, LogOut, Loader2
+  Cpu, Bot, LineChart, Flame, Skull, LogOut, Loader2, CheckSquare
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSupabaseData } from '../hooks/useSupabaseData';
@@ -15,6 +15,8 @@ import Journal from './modules/Journal';
 import CalculatorModule from './modules/Calculator';
 import DirecteurIA from './modules/DirecteurIA';
 import SettingsModule from './modules/Settings';
+import Checklist from './modules/Checklist';
+import AdvancedAnalytics from './modules/AdvancedAnalytics';
 
 const MethodeAlpha = () => {
   const { user, signOut } = useAuth();
@@ -27,7 +29,20 @@ const MethodeAlpha = () => {
     deleteJournalEntry,
     deleteAllJournalEntries,
     saveAIAnalysis,
-    isDataLoaded 
+    isDataLoaded,
+    // Checklist data
+    checklistTemplates,
+    userChecklistItems,
+    checklistSessions,
+    saveUserChecklistItem,
+    updateUserChecklistItem,
+    deleteUserChecklistItem,
+    copyDefaultTemplates,
+    saveChecklistSession,
+    // Active trade data
+    activeTrade,
+    createActiveTrade,
+    closeActiveTrade
   } = useSupabaseData();
 
   // États locaux pour l'interface
@@ -1073,6 +1088,8 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     { id: 'dashboard', name: 'Dashboard', icon: BarChart3 },
     { id: 'calculator', name: 'Calculateur', icon: Calculator },
     { id: 'journal', name: 'Journal', icon: Calendar },
+    { id: 'checklist', name: 'Checklist', icon: CheckSquare },
+    { id: 'analytics', name: 'Analyses', icon: Activity },
     { id: 'ai-analysis', name: 'Directeur IA', icon: Brain },
     { id: 'settings', name: 'Paramètres', icon: Settings },
   ];
@@ -1247,6 +1264,32 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               getDayStatus={getDayStatus}
               deleteJournalEntry={deleteJournalEntry}
               deleteAllJournalEntries={deleteAllJournalEntries}
+            />
+          )}
+
+          {activeTab === 'checklist' && (
+            <Checklist
+              userChecklistItems={userChecklistItems}
+              checklistTemplates={checklistTemplates}
+              checklistSessions={checklistSessions}
+              saveChecklistSession={saveChecklistSession}
+              saveUserChecklistItem={saveUserChecklistItem}
+              updateUserChecklistItem={updateUserChecklistItem}
+              deleteUserChecklistItem={deleteUserChecklistItem}
+              copyDefaultTemplates={copyDefaultTemplates}
+              loadingChecklist={dataLoading}
+              activeTrade={activeTrade}
+              createActiveTrade={createActiveTrade}
+              closeActiveTrade={closeActiveTrade}
+            />
+          )}
+
+          {activeTab === 'analytics' && (
+            <AdvancedAnalytics
+              tradingJournal={tradingJournal}
+              userSettings={userSettings}
+              checklistSessions={checklistSessions}
+              activeTrade={activeTrade}
             />
           )}
 

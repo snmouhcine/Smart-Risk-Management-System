@@ -159,6 +159,242 @@ export class DataService {
     }
   }
   
+  // === CHECKLISTS ===
+  
+  // Récupérer les templates de checklist par défaut
+  static async getChecklistTemplates() {
+    try {
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('is_default', true)
+        .order('type', { ascending: true })
+        .order('order_index', { ascending: true })
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Erreur récupération templates:', error)
+      return []
+    }
+  }
+  
+  // Récupérer les checklists personnalisées de l'utilisateur
+  static async getUserChecklistItems(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('user_checklist_items')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('is_active', true)
+        .order('type', { ascending: true })
+        .order('order_index', { ascending: true })
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Erreur récupération checklist utilisateur:', error)
+      return []
+    }
+  }
+  
+  // Sauvegarder un nouvel item de checklist
+  static async saveUserChecklistItem(userId, itemData) {
+    try {
+      const { data, error } = await supabase
+        .from('user_checklist_items')
+        .insert({
+          user_id: userId,
+          ...itemData,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Item checklist sauvegardé:', data)
+      return data
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde item checklist:', error)
+      throw error
+    }
+  }
+  
+  // Mettre à jour un item de checklist
+  static async updateUserChecklistItem(userId, itemId, updates) {
+    try {
+      const { data, error } = await supabase
+        .from('user_checklist_items')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', itemId)
+        .eq('user_id', userId)
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Item checklist mis à jour:', data)
+      return data
+    } catch (error) {
+      console.error('❌ Erreur mise à jour item checklist:', error)
+      throw error
+    }
+  }
+  
+  // Supprimer un item de checklist
+  static async deleteUserChecklistItem(userId, itemId) {
+    try {
+      const { error } = await supabase
+        .from('user_checklist_items')
+        .delete()
+        .eq('id', itemId)
+        .eq('user_id', userId)
+      
+      if (error) throw error
+      
+      console.log('✅ Item checklist supprimé')
+    } catch (error) {
+      console.error('❌ Erreur suppression item checklist:', error)
+      throw error
+    }
+  }
+  
+  // Copier les templates par défaut vers les items utilisateur
+  static async copyDefaultTemplates(userId) {
+    try {
+      const { data, error } = await supabase
+        .rpc('copy_default_templates_to_user', { p_user_id: userId })
+      
+      if (error) throw error
+      
+      console.log('✅ Templates copiés vers checklist utilisateur')
+      return true
+    } catch (error) {
+      console.error('❌ Erreur copie templates:', error)
+      throw error
+    }
+  }
+  
+  // Sauvegarder une session de checklist
+  static async saveChecklistSession(userId, sessionData) {
+    try {
+      const { data, error } = await supabase
+        .from('checklist_sessions')
+        .insert({
+          user_id: userId,
+          ...sessionData,
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Session checklist sauvegardée:', data)
+      return data
+    } catch (error) {
+      console.error('❌ Erreur sauvegarde session:', error)
+      throw error
+    }
+  }
+  
+  // Récupérer les sessions de checklist récentes
+  static async getChecklistSessions(userId, limit = 10) {
+    try {
+      const { data, error } = await supabase
+        .from('checklist_sessions')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(limit)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Erreur récupération sessions:', error)
+      return []
+    }
+  }
+  
+  // === TRADES ACTIFS ===
+  
+  // Récupérer le trade actif
+  static async getActiveTrade(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('active_trades')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error
+      
+      return data
+    } catch (error) {
+      console.error('Erreur récupération trade actif:', error)
+      return null
+    }
+  }
+  
+  // Créer un nouveau trade actif
+  static async createActiveTrade(userId, tradeData) {
+    try {
+      const { data, error } = await supabase
+        .from('active_trades')
+        .insert({
+          user_id: userId,
+          ...tradeData,
+          status: 'active',
+          entry_time: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Trade actif créé:', data)
+      return data
+    } catch (error) {
+      console.error('❌ Erreur création trade actif:', error)
+      throw error
+    }
+  }
+  
+  // Fermer un trade actif
+  static async closeActiveTrade(userId, tradeId, exitSessionId) {
+    try {
+      const { data, error } = await supabase
+        .from('active_trades')
+        .update({
+          status: 'completed',
+          exit_time: new Date().toISOString(),
+          exit_session_id: exitSessionId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', tradeId)
+        .eq('user_id', userId)
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      console.log('✅ Trade fermé:', data)
+      return data
+    } catch (error) {
+      console.error('❌ Erreur fermeture trade:', error)
+      throw error
+    }
+  }
+  
   // === ANALYSES IA ===
   
   // Sauvegarder une analyse IA

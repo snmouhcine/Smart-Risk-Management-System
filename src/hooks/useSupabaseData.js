@@ -12,6 +12,10 @@ export const useSupabaseData = () => {
   const [userSettings, setUserSettings] = useState(null)
   const [tradingJournal, setTradingJournal] = useState({})
   const [migrationCompleted, setMigrationCompleted] = useState(false)
+  const [checklistTemplates, setChecklistTemplates] = useState([])
+  const [userChecklistItems, setUserChecklistItems] = useState([])
+  const [checklistSessions, setChecklistSessions] = useState([])
+  const [activeTrade, setActiveTrade] = useState(null)
 
   // Charger les données utilisateur
   const loadUserData = async () => {
@@ -30,6 +34,22 @@ export const useSupabaseData = () => {
       // Charger le journal
       const journal = await DataService.getTradingJournal(user.id)
       setTradingJournal(journal)
+      
+      // Charger les templates de checklist
+      const templates = await DataService.getChecklistTemplates()
+      setChecklistTemplates(templates)
+      
+      // Charger les items de checklist utilisateur
+      const items = await DataService.getUserChecklistItems(user.id)
+      setUserChecklistItems(items)
+      
+      // Charger les sessions de checklist récentes
+      const sessions = await DataService.getChecklistSessions(user.id)
+      setChecklistSessions(sessions)
+      
+      // Charger le trade actif s'il existe
+      const trade = await DataService.getActiveTrade(user.id)
+      setActiveTrade(trade)
       
       console.log('✅ Données utilisateur chargées')
       
@@ -174,6 +194,146 @@ export const useSupabaseData = () => {
       throw err
     }
   }
+  
+  // === CHECKLIST FUNCTIONS ===
+  
+  // Sauvegarder un item de checklist
+  const saveUserChecklistItem = async (itemData) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('💾 Sauvegarde item checklist...')
+      const saved = await DataService.saveUserChecklistItem(user.id, itemData)
+      
+      // Mettre à jour l'état local
+      setUserChecklistItems(prev => [...prev, saved])
+      
+      return saved
+    } catch (err) {
+      console.error('❌ Erreur sauvegarde item:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Mettre à jour un item de checklist
+  const updateUserChecklistItem = async (itemId, updates) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('💾 Mise à jour item checklist...')
+      const updated = await DataService.updateUserChecklistItem(user.id, itemId, updates)
+      
+      // Mettre à jour l'état local
+      setUserChecklistItems(prev => 
+        prev.map(item => item.id === itemId ? updated : item)
+      )
+      
+      return updated
+    } catch (err) {
+      console.error('❌ Erreur mise à jour item:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Supprimer un item de checklist
+  const deleteUserChecklistItem = async (itemId) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression item checklist...')
+      await DataService.deleteUserChecklistItem(user.id, itemId)
+      
+      // Mettre à jour l'état local
+      setUserChecklistItems(prev => prev.filter(item => item.id !== itemId))
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur suppression item:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Copier les templates par défaut
+  const copyDefaultTemplates = async () => {
+    if (!user?.id) return
+    
+    try {
+      console.log('📋 Copie des templates par défaut...')
+      await DataService.copyDefaultTemplates(user.id)
+      
+      // Recharger les items utilisateur
+      const items = await DataService.getUserChecklistItems(user.id)
+      setUserChecklistItems(items)
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur copie templates:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Sauvegarder une session de checklist
+  const saveChecklistSession = async (sessionData) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('💾 Sauvegarde session checklist...')
+      const saved = await DataService.saveChecklistSession(user.id, sessionData)
+      
+      // Ajouter à l'état local
+      setChecklistSessions(prev => [saved, ...prev])
+      
+      return saved
+    } catch (err) {
+      console.error('❌ Erreur sauvegarde session:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // === ACTIVE TRADE FUNCTIONS ===
+  
+  // Créer un trade actif
+  const createActiveTrade = async (tradeData) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('💾 Création trade actif...')
+      const created = await DataService.createActiveTrade(user.id, tradeData)
+      
+      // Mettre à jour l'état local
+      setActiveTrade(created)
+      
+      return created
+    } catch (err) {
+      console.error('❌ Erreur création trade:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Fermer le trade actif
+  const closeActiveTrade = async (exitSessionId) => {
+    if (!user?.id || !activeTrade) return
+    
+    try {
+      console.log('💾 Fermeture trade actif...')
+      const closed = await DataService.closeActiveTrade(user.id, activeTrade.id, exitSessionId)
+      
+      // Mettre à jour l'état local
+      setActiveTrade(null)
+      
+      return closed
+    } catch (err) {
+      console.error('❌ Erreur fermeture trade:', err)
+      setError(err)
+      throw err
+    }
+  }
 
   // Effet pour charger les données quand l'utilisateur change
   useEffect(() => {
@@ -197,6 +357,10 @@ export const useSupabaseData = () => {
     userSettings,
     tradingJournal,
     migrationCompleted,
+    checklistTemplates,
+    userChecklistItems,
+    checklistSessions,
+    activeTrade,
     
     // Actions
     loadUserData,
@@ -206,6 +370,17 @@ export const useSupabaseData = () => {
     deleteAllJournalEntries,
     saveAIAnalysis,
     savePositionCalculation,
+    
+    // Checklist Actions
+    saveUserChecklistItem,
+    updateUserChecklistItem,
+    deleteUserChecklistItem,
+    copyDefaultTemplates,
+    saveChecklistSession,
+    
+    // Active Trade Actions
+    createActiveTrade,
+    closeActiveTrade,
     
     // Helpers
     clearError: () => setError(null),
