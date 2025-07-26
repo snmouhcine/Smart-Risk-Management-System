@@ -16,6 +16,7 @@ export const useSupabaseData = () => {
   const [userChecklistItems, setUserChecklistItems] = useState([])
   const [checklistSessions, setChecklistSessions] = useState([])
   const [activeTrade, setActiveTrade] = useState(null)
+  const [completedTrades, setCompletedTrades] = useState([])
 
   // Charger les données utilisateur
   const loadUserData = async () => {
@@ -50,6 +51,10 @@ export const useSupabaseData = () => {
       // Charger le trade actif s'il existe
       const trade = await DataService.getActiveTrade(user.id)
       setActiveTrade(trade)
+      
+      // Charger les trades complétés
+      const completed = await DataService.getCompletedTrades(user.id)
+      setCompletedTrades(completed)
       
       console.log('✅ Données utilisateur chargées')
       
@@ -284,12 +289,53 @@ export const useSupabaseData = () => {
       console.log('💾 Sauvegarde session checklist...')
       const saved = await DataService.saveChecklistSession(user.id, sessionData)
       
-      // Ajouter à l'état local
-      setChecklistSessions(prev => [saved, ...prev])
+      // Ajouter à l'état local avec les arrays de trades vides
+      setChecklistSessions(prev => [{
+        ...saved,
+        entry_trades: [],
+        exit_trades: []
+      }, ...prev])
       
       return saved
     } catch (err) {
       console.error('❌ Erreur sauvegarde session:', err)
+      setError(err)
+      throw err
+    }
+  }
+
+  const deleteChecklistSession = async (sessionId) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression session checklist...')
+      await DataService.deleteChecklistSession(user.id, sessionId)
+      
+      // Retirer de l'état local
+      setChecklistSessions(prev => prev.filter(s => s.id !== sessionId))
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur suppression session:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  const deleteAllChecklistSessions = async () => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression de toutes les sessions checklist...')
+      await DataService.deleteAllChecklistSessions(user.id)
+      
+      // Vider l'état local
+      setChecklistSessions([])
+      setActiveTrade(null)
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur suppression globale sessions:', err)
       setError(err)
       throw err
     }
@@ -317,19 +363,61 @@ export const useSupabaseData = () => {
   }
   
   // Fermer le trade actif
-  const closeActiveTrade = async (exitSessionId) => {
-    if (!user?.id || !activeTrade) return
+  const closeActiveTrade = async (exitSessionId, tradeResult, exitScore) => {
+    if (!activeTrade) {
+      console.error('Aucun trade actif à fermer')
+      return null
+    }
     
     try {
-      console.log('💾 Fermeture trade actif...')
-      const closed = await DataService.closeActiveTrade(user.id, activeTrade.id, exitSessionId)
+      const closed = await DataService.closeActiveTrade(user.id, activeTrade.id, exitSessionId, tradeResult, exitScore)
       
-      // Mettre à jour l'état local
+      // Mettre à jour l'état du trade actif
       setActiveTrade(null)
       
+      // Ajouter le trade fermé aux trades complétés
+      setCompletedTrades(prev => [closed, ...prev])
+      
       return closed
+    } catch (error) {
+      setError(error)
+      throw error
+    }
+  }
+  
+  // Supprimer un trade complété
+  const deleteCompletedTrade = async (tradeId) => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression trade complété...')
+      await DataService.deleteCompletedTrade(user.id, tradeId)
+      
+      // Retirer de l'état local
+      setCompletedTrades(prev => prev.filter(t => t.id !== tradeId))
+      
+      return true
     } catch (err) {
-      console.error('❌ Erreur fermeture trade:', err)
+      console.error('❌ Erreur suppression trade:', err)
+      setError(err)
+      throw err
+    }
+  }
+  
+  // Supprimer tous les trades complétés
+  const deleteAllCompletedTrades = async () => {
+    if (!user?.id) return
+    
+    try {
+      console.log('🗑️ Suppression de tous les trades complétés...')
+      await DataService.deleteAllCompletedTrades(user.id)
+      
+      // Vider l'état local
+      setCompletedTrades([])
+      
+      return true
+    } catch (err) {
+      console.error('❌ Erreur suppression globale trades:', err)
       setError(err)
       throw err
     }
@@ -361,6 +449,7 @@ export const useSupabaseData = () => {
     userChecklistItems,
     checklistSessions,
     activeTrade,
+    completedTrades,
     
     // Actions
     loadUserData,
@@ -377,10 +466,14 @@ export const useSupabaseData = () => {
     deleteUserChecklistItem,
     copyDefaultTemplates,
     saveChecklistSession,
+    deleteChecklistSession,
+    deleteAllChecklistSessions,
     
     // Active Trade Actions
     createActiveTrade,
     closeActiveTrade,
+    deleteCompletedTrade,
+    deleteAllCompletedTrades,
     
     // Helpers
     clearError: () => setError(null),

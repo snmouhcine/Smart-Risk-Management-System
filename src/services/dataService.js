@@ -306,21 +306,94 @@ export class DataService {
   }
   
   // Récupérer les sessions de checklist récentes
-  static async getChecklistSessions(userId, limit = 10) {
+  static async getChecklistSessions(userId, limit = 50) {
     try {
-      const { data, error } = await supabase
+      // Récupérer d'abord les sessions
+      const { data: sessions, error: sessionsError } = await supabase
         .from('checklist_sessions')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(limit)
       
-      if (error) throw error
+      if (sessionsError) throw sessionsError
       
-      return data || []
+      if (!sessions || sessions.length === 0) return []
+      
+      // Récupérer les trades associés séparément
+      const sessionIds = sessions.map(s => s.id)
+      const { data: trades, error: tradesError } = await supabase
+        .from('active_trades')
+        .select('*')
+        .eq('user_id', userId)
+        .or(`entry_session_id.in.(${sessionIds.join(',')}),exit_session_id.in.(${sessionIds.join(',')})`)
+      
+      if (tradesError) {
+        console.error('Erreur récupération trades:', tradesError)
+      }
+      
+      // Associer les trades aux sessions
+      const sessionsWithTrades = sessions.map(session => {
+        const entryTrades = trades?.filter(t => t.entry_session_id === session.id) || []
+        const exitTrades = trades?.filter(t => t.exit_session_id === session.id) || []
+        
+        return {
+          ...session,
+          entry_trades: entryTrades,
+          exit_trades: exitTrades
+        }
+      })
+      
+      return sessionsWithTrades
     } catch (error) {
       console.error('Erreur récupération sessions:', error)
       return []
+    }
+  }
+
+  static async deleteChecklistSession(userId, sessionId) {
+    try {
+      const { error } = await supabase
+        .from('checklist_sessions')
+        .delete()
+        .eq('id', sessionId)
+        .eq('user_id', userId)
+      
+      if (error) throw error
+      
+      console.log('✅ Session supprimée')
+      return true
+    } catch (error) {
+      console.error('❌ Erreur suppression session:', error)
+      throw error
+    }
+  }
+  
+  static async deleteAllChecklistSessions(userId) {
+    try {
+      // Supprimer d'abord tous les trades associés
+      const { error: tradesError } = await supabase
+        .from('active_trades')
+        .delete()
+        .eq('user_id', userId)
+      
+      if (tradesError) {
+        console.error('Erreur suppression trades:', tradesError)
+      }
+      
+      // Puis supprimer toutes les sessions
+      const { error } = await supabase
+        .from('checklist_sessions')
+        .delete()
+        .eq('user_id', userId)
+      
+      if (error) throw error
+      
+      console.log('✅ Toutes les sessions supprimées')
+      return true
+    } catch (error) {
+      console.error('❌ Erreur suppression sessions:', error)
+      throw error
     }
   }
   
@@ -345,6 +418,64 @@ export class DataService {
     }
   }
   
+  // Récupérer les trades complétés
+  static async getCompletedTrades(userId, limit = 50) {
+    try {
+      const { data, error } = await supabase
+        .from('active_trades')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+        .order('exit_time', { ascending: false })
+        .limit(limit)
+      
+      if (error) throw error
+      
+      return data || []
+    } catch (error) {
+      console.error('Erreur récupération trades complétés:', error)
+      return []
+    }
+  }
+  
+  // Supprimer un trade complété
+  static async deleteCompletedTrade(userId, tradeId) {
+    try {
+      const { error } = await supabase
+        .from('active_trades')
+        .delete()
+        .eq('id', tradeId)
+        .eq('user_id', userId)
+      
+      if (error) throw error
+      
+      console.log('✅ Trade supprimé')
+      return true
+    } catch (error) {
+      console.error('❌ Erreur suppression trade:', error)
+      throw error
+    }
+  }
+  
+  // Supprimer tous les trades complétés
+  static async deleteAllCompletedTrades(userId) {
+    try {
+      const { error } = await supabase
+        .from('active_trades')
+        .delete()
+        .eq('user_id', userId)
+        .eq('status', 'completed')
+      
+      if (error) throw error
+      
+      console.log('✅ Tous les trades complétés supprimés')
+      return true
+    } catch (error) {
+      console.error('❌ Erreur suppression trades:', error)
+      throw error
+    }
+  }
+  
   // Créer un nouveau trade actif
   static async createActiveTrade(userId, tradeData) {
     try {
@@ -352,7 +483,9 @@ export class DataService {
         .from('active_trades')
         .insert({
           user_id: userId,
-          ...tradeData,
+          entry_session_id: tradeData.entry_session_id,
+          entry_score: tradeData.entry_score,
+          symbol: tradeData.symbol,
           status: 'active',
           entry_time: new Date().toISOString()
         })
@@ -370,14 +503,33 @@ export class DataService {
   }
   
   // Fermer un trade actif
-  static async closeActiveTrade(userId, tradeId, exitSessionId) {
+  static async closeActiveTrade(userId, tradeId, exitSessionId, tradeResult, exitScore) {
     try {
+      // D'abord récupérer le trade actif pour calculer la durée
+      const { data: trade, error: fetchError } = await supabase
+        .from('active_trades')
+        .select('*')
+        .eq('id', tradeId)
+        .eq('user_id', userId)
+        .single()
+      
+      if (fetchError) throw fetchError
+      
+      // Calculer la durée en secondes
+      const entryTime = new Date(trade.entry_time)
+      const exitTime = new Date()
+      const durationSeconds = Math.floor((exitTime - entryTime) / 1000)
+      
+      // Mettre à jour le trade avec les informations de sortie
       const { data, error } = await supabase
         .from('active_trades')
         .update({
           status: 'completed',
-          exit_time: new Date().toISOString(),
+          exit_time: exitTime.toISOString(),
           exit_session_id: exitSessionId,
+          exit_score: exitScore,
+          duration_seconds: durationSeconds,
+          trade_result: tradeResult,
           updated_at: new Date().toISOString()
         })
         .eq('id', tradeId)

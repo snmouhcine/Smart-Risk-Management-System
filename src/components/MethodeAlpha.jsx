@@ -39,10 +39,15 @@ const MethodeAlpha = () => {
     deleteUserChecklistItem,
     copyDefaultTemplates,
     saveChecklistSession,
+    deleteChecklistSession,
+    deleteAllChecklistSessions,
     // Active trade data
     activeTrade,
     createActiveTrade,
-    closeActiveTrade
+    closeActiveTrade,
+    completedTrades,
+    deleteCompletedTrade,
+    deleteAllCompletedTrades
   } = useSupabaseData();
 
   // États locaux pour l'interface
@@ -1280,6 +1285,8 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               checklistTemplates={checklistTemplates}
               checklistSessions={checklistSessions}
               saveChecklistSession={saveChecklistSession}
+              deleteChecklistSession={deleteChecklistSession}
+              deleteAllChecklistSessions={deleteAllChecklistSessions}
               saveUserChecklistItem={saveUserChecklistItem}
               updateUserChecklistItem={updateUserChecklistItem}
               deleteUserChecklistItem={deleteUserChecklistItem}
@@ -1288,6 +1295,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               activeTrade={activeTrade}
               createActiveTrade={createActiveTrade}
               closeActiveTrade={closeActiveTrade}
+              completedTrades={completedTrades}
+              deleteCompletedTrade={deleteCompletedTrade}
+              deleteAllCompletedTrades={deleteAllCompletedTrades}
             />
           )}
 

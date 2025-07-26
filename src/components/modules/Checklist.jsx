@@ -22,15 +22,41 @@ import {
   Zap,
   Award,
   Timer,
-  Activity
+  Activity,
+  BarChart3,
+  PieChart
 } from 'lucide-react';
 import { formatPercentage } from '../../utils/formatters';
+
+// Liste des symboles futures uniquement
+const TRADING_SYMBOLS = [
+  // Indices Futures
+  'NQ',   // E-mini Nasdaq-100
+  'MNQ',  // Micro E-mini Nasdaq-100
+  'ES',   // E-mini S&P 500
+  'MES',  // Micro E-mini S&P 500
+  'YM',   // E-mini Dow
+  'MYM',  // Micro E-mini Dow
+  'RTY',  // E-mini Russell 2000
+  'M2K',  // Micro E-mini Russell 2000
+  // Commodities Futures
+  'CL',   // Crude Oil
+  'GC',   // Gold
+  'SI',   // Silver
+  // Treasury Futures
+  'ZB',   // 30-Year T-Bond
+  'ZN',   // 10-Year T-Note
+  'ZF',   // 5-Year T-Note
+  'ZT'    // 2-Year T-Note
+];
 
 const Checklist = ({
   userChecklistItems,
   checklistTemplates,
   checklistSessions,
   saveChecklistSession,
+  deleteChecklistSession,
+  deleteAllChecklistSessions,
   saveUserChecklistItem,
   updateUserChecklistItem,
   deleteUserChecklistItem,
@@ -38,7 +64,10 @@ const Checklist = ({
   loadingChecklist,
   activeTrade,
   createActiveTrade,
-  closeActiveTrade
+  closeActiveTrade,
+  completedTrades,
+  deleteCompletedTrade,
+  deleteAllCompletedTrades
 }) => {
   const [activeTab, setActiveTab] = useState('entry');
   const [checkedItems, setCheckedItems] = useState(new Set());
@@ -52,6 +81,15 @@ const Checklist = ({
     is_mandatory: false,
     category: 'Personnel'
   });
+  
+  // État pour les détails du trade
+  const [tradeDetails, setTradeDetails] = useState({
+    symbol: 'NQ' // Symbole futures par défaut
+  });
+  
+  // État pour le popup de résultat du trade
+  const [showResultPopup, setShowResultPopup] = useState(false);
+  const [pendingExitSession, setPendingExitSession] = useState(null);
   
   // État pour le timer du trade
   const [tradeStartTime, setTradeStartTime] = useState(null);
@@ -172,7 +210,9 @@ const Checklist = ({
         checked: checkedItems.has(item.id)
       })),
       total_score: score,
-      status: 'completed'
+      status: 'completed',
+      trade_date: new Date().toISOString().split('T')[0],
+      symbol: tradeDetails.symbol // Ajouter le symbole pour toutes les sessions
     };
 
     try {
@@ -184,16 +224,19 @@ const Checklist = ({
       if (activeTab === 'entry' && score >= 60 && mandatoryMet) {
         console.log('🚀 Création du trade actif...');
         const newTrade = await createActiveTrade({
-          entry_session_id: savedSession.id
+          entry_session_id: savedSession.id,
+          entry_score: score,
+          symbol: tradeDetails.symbol
         });
         console.log('✅ Trade créé:', newTrade);
       }
       
-      // Si c'est une sortie et qu'il y a un trade actif, le fermer
+      // Si c'est une sortie et qu'il y a un trade actif, montrer le popup de résultat
       if (activeTab === 'exit' && activeTrade && score >= 40) {
-        console.log('🏁 Fermeture du trade...');
-        const closedTrade = await closeActiveTrade(savedSession.id);
-        console.log('✅ Trade fermé:', closedTrade);
+        console.log('🏁 Préparation fermeture du trade...');
+        setPendingExitSession(savedSession);
+        setShowResultPopup(true);
+        return; // Ne pas fermer le trade tout de suite, attendre le choix du résultat
       }
       
       // Réinitialiser après sauvegarde
@@ -291,6 +334,81 @@ const Checklist = ({
     }
   };
 
+  // Gérer la fermeture du trade avec résultat
+  const handleCloseTradeWithResult = async (result) => {
+    if (!pendingExitSession || !activeTrade) return;
+    
+    try {
+      console.log('🏁 Fermeture du trade avec résultat:', result);
+      const closedTrade = await closeActiveTrade(pendingExitSession.id, result, pendingExitSession.total_score);
+      console.log('✅ Trade fermé:', closedTrade);
+      
+      // Réinitialiser les états
+      setShowResultPopup(false);
+      setPendingExitSession(null);
+      setCheckedItems(new Set());
+    } catch (error) {
+      console.error('❌ Erreur fermeture trade:', error);
+      alert('Erreur lors de la fermeture du trade.');
+    }
+  };
+
+  // Gérer la suppression d'une session
+  const handleDeleteSession = async (sessionId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette session ?')) {
+      try {
+        console.log('🗑️ Tentative de suppression session:', sessionId);
+        await deleteChecklistSession(sessionId);
+        console.log('✅ Session supprimée avec succès');
+      } catch (error) {
+        console.error('❌ Erreur suppression session:', error);
+        alert(`Erreur lors de la suppression: ${error.message || 'Erreur inconnue'}`);
+      }
+    }
+  };
+  
+  // Gérer la suppression de toutes les sessions
+  const handleDeleteAllSessions = async () => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer tout l\'historique ? Cette action est irréversible.')) {
+      try {
+        console.log('🗑️ Suppression de tout l\'historique...');
+        await deleteAllChecklistSessions();
+        console.log('✅ Historique supprimé avec succès');
+      } catch (error) {
+        console.error('❌ Erreur suppression historique:', error);
+        alert(`Erreur lors de la suppression de l'historique: ${error.message || 'Erreur inconnue'}`);
+      }
+    }
+  };
+  
+  // Gérer la suppression d'un trade
+  const handleDeleteTrade = async (tradeId) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce trade ?')) {
+      try {
+        console.log('🗑️ Tentative de suppression trade:', tradeId);
+        await deleteCompletedTrade(tradeId);
+        console.log('✅ Trade supprimé avec succès');
+      } catch (error) {
+        console.error('❌ Erreur suppression trade:', error);
+        alert(`Erreur lors de la suppression: ${error.message || 'Erreur inconnue'}`);
+      }
+    }
+  };
+  
+  // Gérer la suppression de tous les trades
+  const handleDeleteAllTrades = async () => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer tout l\'historique des trades ? Cette action est irréversible.')) {
+      try {
+        console.log('🗑️ Suppression de tous les trades...');
+        await deleteAllCompletedTrades();
+        console.log('✅ Tous les trades supprimés avec succès');
+      } catch (error) {
+        console.error('❌ Erreur suppression trades:', error);
+        alert(`Erreur lors de la suppression des trades: ${error.message || 'Erreur inconnue'}`);
+      }
+    }
+  };
+
   // Vérifier si on peut procéder (pour entrée) ou devrait sortir (pour sortie)
   const canProceed = activeTab === 'entry' 
     ? score >= 60 && mandatoryMet && !activeTrade
@@ -364,14 +482,19 @@ const Checklist = ({
           </button>
           <button
             onClick={() => {
-              setActiveTab('exit');
-              setCheckedItems(new Set());
+              if (activeTrade) {
+                setActiveTab('exit');
+                setCheckedItems(new Set());
+              }
             }}
+            disabled={!activeTrade}
             className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 rounded-lg font-medium transition-all ${
               activeTab === 'exit'
                 ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            } ${activeTrade ? 'animate-pulse' : ''}`}
+                : !activeTrade
+                  ? 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+            } ${activeTrade && activeTab === 'exit' ? 'animate-pulse' : ''}`}
           >
             <LogOut className="w-5 h-5" />
             <span>Checklist de Sortie</span>
@@ -689,6 +812,28 @@ const Checklist = ({
           )}
         </div>
 
+        {/* Formulaire de détails du trade pour l'entrée */}
+        {!isManageMode && activeTab === 'entry' && score >= 60 && mandatoryMet && !activeTrade && (
+          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg">
+            <h4 className="font-semibold text-slate-900 mb-3 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-blue-600" />
+              Détails du Trade
+            </h4>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Symbole/Paire</label>
+              <select
+                value={tradeDetails.symbol}
+                onChange={(e) => setTradeDetails({...tradeDetails, symbol: e.target.value})}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+              >
+                {TRADING_SYMBOLS.map(symbol => (
+                  <option key={symbol} value={symbol}>{symbol}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         {/* Boutons d'action */}
         {!isManageMode && (
           <div className="mt-6 flex space-x-3">
@@ -733,41 +878,368 @@ const Checklist = ({
         )}
       </div>
 
-      {/* Sessions Récentes */}
-      {checklistSessions && checklistSessions.length > 0 && (
+      {/* Popup de résultat du trade */}
+      {showResultPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-2xl shadow-xl max-w-md w-full mx-4">
+            <h3 className="text-xl font-semibold text-slate-900 mb-4 flex items-center">
+              <TrendingUp className="w-6 h-6 mr-2 text-purple-600" />
+              Résultat du Trade
+            </h3>
+            <p className="text-slate-600 mb-6">
+              Le trade est-il terminé avec un profit ou une perte ?
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={() => handleCloseTradeWithResult('profit')}
+                className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center space-x-2"
+              >
+                <TrendingUp className="w-5 h-5" />
+                <span>Profit</span>
+              </button>
+              <button
+                onClick={() => handleCloseTradeWithResult('loss')}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium flex items-center justify-center space-x-2"
+              >
+                <ChevronDown className="w-5 h-5" />
+                <span>Perte</span>
+              </button>
+            </div>
+            <button
+              onClick={() => {
+                setShowResultPopup(false);
+                setPendingExitSession(null);
+              }}
+              className="w-full mt-3 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Journal de Trading Détaillé */}
+      {completedTrades && completedTrades.length > 0 && (
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center">
-            <Clock className="w-5 h-5 mr-2 text-purple-600" />
-            Sessions de Checklist Récentes
-          </h3>
-          <div className="space-y-2">
-            {checklistSessions.slice(0, 5).map((session) => (
-              <div key={session.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className={`w-2 h-2 rounded-full ${
-                    session.type === 'entry' ? 'bg-blue-500' : 'bg-orange-500'
-                  }`} />
-                  <span className="text-sm font-medium capitalize">{session.type === 'entry' ? 'Entrée' : 'Sortie'}</span>
-                  <span className="text-sm text-slate-600">
-                    {new Date(session.created_at).toLocaleDateString('fr-FR')}
-                  </span>
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-slate-900 flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-purple-600" />
+              Journal de Trading - Historique Détaillé
+            </h3>
+            <button
+              onClick={handleDeleteAllTrades}
+              className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 border border-red-200 rounded-lg flex items-center space-x-1"
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>Effacer tout</span>
+            </button>
+          </div>
+          
+          {/* En-têtes du tableau */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-slate-200">
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Date Entrée</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Date Sortie</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Symbole</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Score Entrée</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Score Sortie</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Durée</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Résultat</th>
+                  <th className="px-3 py-2 text-left text-sm font-medium text-slate-700">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {completedTrades.slice(0, 20).map((trade) => {
+                  return (
+                    <tr key={trade.id} className="border-b border-slate-100 hover:bg-slate-50">
+                      <td className="px-3 py-3 text-sm">
+                        {new Date(trade.entry_time).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="px-3 py-3 text-sm">
+                        {new Date(trade.exit_time).toLocaleDateString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </td>
+                      <td className="px-3 py-3 text-sm font-medium">
+                        {trade.symbol || '-'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center space-x-1">
+                          <div className={`w-2 h-8 rounded ${
+                            trade.entry_score >= 85 ? 'bg-green-500' :
+                            trade.entry_score >= 60 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`} 
+                          style={{height: `${(trade.entry_score / 100) * 32}px`}} />
+                          <span className="text-sm font-medium">{trade.entry_score}%</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center space-x-1">
+                          <div className={`w-2 h-8 rounded ${
+                            trade.exit_score >= 85 ? 'bg-green-500' :
+                            trade.exit_score >= 60 ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`} 
+                          style={{height: `${(trade.exit_score / 100) * 32}px`}} />
+                          <span className="text-sm font-medium">{trade.exit_score}%</span>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-sm">
+                        {trade.duration_seconds ? formatDuration(trade.duration_seconds) : '-'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                          trade.trade_result === 'profit'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-red-100 text-red-700'
+                        }`}>
+                          {trade.trade_result === 'profit' ? 'Profit' : 'Perte'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <button
+                          onClick={() => handleDeleteTrade(trade.id)}
+                          className="p-1 text-red-600 hover:bg-red-50 rounded-lg"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+          
+          {/* KPIs Dashboard */}
+          <div className="mt-6 space-y-6">
+            {/* Statistiques principales */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {/* Total Trades */}
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-100 p-5 rounded-2xl border border-blue-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-blue-500 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-3xl font-bold text-blue-900">{completedTrades.length}</span>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    session.total_score >= 85 ? 'bg-green-100 text-green-700' :
-                    session.total_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {session.total_score}%
-                  </span>
-                  <Award className={`w-4 h-4 ${
-                    session.total_score >= 85 ? 'text-green-600' :
-                    session.total_score >= 60 ? 'text-yellow-600' :
-                    'text-red-600'
-                  }`} />
-                </div>
+                <h3 className="text-sm font-medium text-blue-700">Total Trades</h3>
+                <p className="text-xs text-blue-600 mt-1">Trades complétés</p>
               </div>
-            ))}
+
+              {/* Win Rate */}
+              <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-5 rounded-2xl border border-green-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-green-500 rounded-lg">
+                    <TrendingUp className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-3xl font-bold text-green-900">
+                    {completedTrades.length > 0 
+                      ? Math.round((completedTrades.filter(t => t.trade_result === 'profit').length / completedTrades.length) * 100)
+                      : 0}%
+                  </span>
+                </div>
+                <h3 className="text-sm font-medium text-green-700">Taux de Réussite</h3>
+                <p className="text-xs text-green-600 mt-1">
+                  {completedTrades.filter(t => t.trade_result === 'profit').length} gains / {completedTrades.filter(t => t.trade_result === 'loss').length} pertes
+                </p>
+              </div>
+
+              {/* Average Entry Score */}
+              <div className="bg-gradient-to-br from-purple-50 to-pink-100 p-5 rounded-2xl border border-purple-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-purple-500 rounded-lg">
+                    <Target className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-3xl font-bold text-purple-900">
+                    {completedTrades.length > 0
+                      ? Math.round(completedTrades.reduce((sum, t) => sum + t.entry_score, 0) / completedTrades.length)
+                      : 0}%
+                  </span>
+                </div>
+                <h3 className="text-sm font-medium text-purple-700">Score Moyen d'Entrée</h3>
+                <p className="text-xs text-purple-600 mt-1">Qualité des setups</p>
+              </div>
+
+              {/* Average Duration */}
+              <div className="bg-gradient-to-br from-orange-50 to-amber-100 p-5 rounded-2xl border border-orange-200 shadow-sm">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="p-2 bg-orange-500 rounded-lg">
+                    <Timer className="w-6 h-6 text-white" />
+                  </div>
+                  <span className="text-2xl font-bold text-orange-900">
+                    {completedTrades.length > 0
+                      ? formatDuration(Math.round(completedTrades.reduce((sum, t) => sum + (t.duration_seconds || 0), 0) / completedTrades.length))
+                      : '-'}
+                  </span>
+                </div>
+                <h3 className="text-sm font-medium text-orange-700">Durée Moyenne</h3>
+                <p className="text-xs text-orange-600 mt-1">Par trade</p>
+              </div>
+            </div>
+
+            {/* Performance par Score d'Entrée */}
+            <div className="bg-gradient-to-br from-slate-50 to-slate-100 p-6 rounded-2xl border border-slate-200 shadow-sm">
+              <h4 className="text-lg font-semibold text-slate-800 mb-4 flex items-center">
+                <Activity className="w-5 h-5 mr-2 text-indigo-600" />
+                Performance par Score d'Entrée
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {(() => {
+                  const scoreRanges = [
+                    { min: 90, max: 100, label: '90-100%', color: 'emerald', icon: '🏆' },
+                    { min: 80, max: 89, label: '80-89%', color: 'green', icon: '✨' },
+                    { min: 70, max: 79, label: '70-79%', color: 'yellow', icon: '📊' },
+                    { min: 60, max: 69, label: '60-69%', color: 'orange', icon: '📈' }
+                  ];
+                  
+                  return scoreRanges.map(range => {
+                    const tradesInRange = completedTrades.filter(t => 
+                      t.entry_score >= range.min && t.entry_score <= range.max
+                    );
+                    const wins = tradesInRange.filter(t => t.trade_result === 'profit').length;
+                    const total = tradesInRange.length;
+                    const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
+                    
+                    return (
+                      <div key={range.label} className={`bg-white p-4 rounded-xl border-2 shadow-sm ${
+                        range.color === 'emerald' ? 'border-emerald-200' :
+                        range.color === 'green' ? 'border-green-200' :
+                        range.color === 'yellow' ? 'border-yellow-200' :
+                        'border-orange-200'
+                      }`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-2xl">{range.icon}</span>
+                          <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                            range.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                            range.color === 'green' ? 'bg-green-100 text-green-700' :
+                            range.color === 'yellow' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-orange-100 text-orange-700'
+                          }`}>
+                            {range.label}
+                          </span>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm text-slate-600">Win Rate</span>
+                            <span className={`text-2xl font-bold ${winRate >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+                              {total > 0 ? `${winRate}%` : '-'}
+                            </span>
+                          </div>
+                          
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full transition-all duration-500 ${
+                                winRate >= 70 ? 'bg-green-500' : 
+                                winRate >= 50 ? 'bg-yellow-500' : 
+                                'bg-red-500'
+                              }`}
+                              style={{ width: `${winRate}%` }}
+                            />
+                          </div>
+                          
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>{wins} gains</span>
+                            <span>{total - wins} pertes</span>
+                          </div>
+                          
+                          <div className="text-center pt-2 border-t border-gray-100">
+                            <span className="text-xs font-medium text-slate-600">
+                              {total} {total === 1 ? 'trade' : 'trades'} total
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+
+            {/* Statistiques par Symbole */}
+            {(() => {
+              const symbolStats = completedTrades.reduce((acc, trade) => {
+                const symbol = trade.symbol || 'N/A';
+                if (!acc[symbol]) {
+                  acc[symbol] = { total: 0, wins: 0, totalDuration: 0 };
+                }
+                acc[symbol].total++;
+                if (trade.trade_result === 'profit') acc[symbol].wins++;
+                acc[symbol].totalDuration += trade.duration_seconds || 0;
+                return acc;
+              }, {});
+
+              const symbolArray = Object.entries(symbolStats)
+                .map(([symbol, stats]) => ({
+                  symbol,
+                  ...stats,
+                  winRate: Math.round((stats.wins / stats.total) * 100),
+                  avgDuration: Math.round(stats.totalDuration / stats.total)
+                }))
+                .sort((a, b) => b.total - a.total)
+                .slice(0, 5);
+
+              if (symbolArray.length === 0) return null;
+
+              return (
+                <div className="bg-gradient-to-br from-indigo-50 to-blue-100 p-6 rounded-2xl border border-indigo-200 shadow-sm">
+                  <h4 className="text-lg font-semibold text-indigo-800 mb-4 flex items-center">
+                    <PieChart className="w-5 h-5 mr-2 text-indigo-600" />
+                    Performance par Symbole (Top 5)
+                  </h4>
+                  <div className="space-y-3">
+                    {symbolArray.map((item, index) => (
+                      <div key={item.symbol} className="flex items-center justify-between p-3 bg-white rounded-lg">
+                        <div className="flex items-center space-x-3">
+                          <span className="text-lg font-bold text-indigo-600">#{index + 1}</span>
+                          <div>
+                            <span className="font-medium text-slate-800">{item.symbol}</span>
+                            <span className="text-xs text-slate-500 ml-2">{item.total} trades</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                          <div className="text-right">
+                            <div className={`text-sm font-semibold ${item.winRate >= 50 ? 'text-green-600' : 'text-red-600'}`}>
+                              {item.winRate}% win
+                            </div>
+                            <div className="text-xs text-slate-500">
+                              {formatDuration(item.avgDuration)} moy
+                            </div>
+                          </div>
+                          <div className="w-24">
+                            <div className="w-full bg-gray-200 rounded-full h-3">
+                              <div 
+                                className={`h-3 rounded-full ${
+                                  item.winRate >= 70 ? 'bg-green-500' : 
+                                  item.winRate >= 50 ? 'bg-yellow-500' : 
+                                  'bg-red-500'
+                                }`}
+                                style={{ width: `${item.winRate}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

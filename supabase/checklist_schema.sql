@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS checklist_sessions (
     total_score INTEGER NOT NULL CHECK (total_score >= 0 AND total_score <= 100),
     status VARCHAR(20) NOT NULL CHECK (status IN ('completed', 'cancelled', 'saved')),
     trade_date DATE,
+    symbol VARCHAR(50), -- Trading symbol/pair
     notes TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -51,6 +52,8 @@ CREATE TABLE IF NOT EXISTS active_trades (
     exit_session_id UUID REFERENCES checklist_sessions(id),
     entry_time TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     exit_time TIMESTAMP WITH TIME ZONE,
+    duration_seconds INTEGER, -- Calculated duration in seconds
+    trade_result VARCHAR(10) CHECK (trade_result IN ('profit', 'loss', NULL)), -- Trade outcome
     status VARCHAR(20) NOT NULL CHECK (status IN ('active', 'completed', 'cancelled')) DEFAULT 'active',
     instrument VARCHAR(100),
     notes TEXT,
