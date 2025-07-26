@@ -583,7 +583,32 @@ const SettingsModule = ({
                   Gérez votre abonnement directement depuis le portail Stripe.
                 </p>
                 <button
-                  onClick={() => window.open('https://billing.stripe.com/p/login/test_YOUR_LINK', '_blank')}
+                  onClick={async () => {
+                    try {
+                      // Try to use Edge Function with email lookup
+                      const { data, error } = await supabase.functions.invoke('create-portal-session-email', {
+                        body: {
+                          customerEmail: user?.email,
+                          returnUrl: window.location.origin + '/app'
+                        }
+                      })
+                      
+                      if (data?.url) {
+                        window.location.href = data.url
+                      } else {
+                        throw new Error('Portal session creation failed')
+                      }
+                    } catch (error) {
+                      console.error('Portal error:', error)
+                      // Fallback: Show instructions for manual management
+                      alert(
+                        'Pour gérer votre abonnement:\n\n' +
+                        '1. Connectez-vous à Stripe avec votre email: ' + user?.email + '\n' +
+                        '2. Ou contactez le support: support@smartriskmanagement.com\n\n' +
+                        'Nous travaillons à améliorer ce processus.'
+                      )
+                    }
+                  }}
                   className="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center gap-2"
                 >
                   <CreditCard className="h-4 w-4" />
