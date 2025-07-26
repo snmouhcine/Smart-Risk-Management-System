@@ -48,30 +48,53 @@ const PaymentSuccessAutomatic = () => {
       try {
         console.log('Activating subscription for:', activeUser.email)
         
-        // First check if Edge Function exists
-        const { data, error } = await supabase.functions.invoke('confirm-payment', {
-          body: { 
-            sessionId: new URLSearchParams(window.location.search).get('session_id'),
-            userEmail: activeUser.email 
-          }
-        }).catch(err => {
-          console.log('Edge function not available, using direct update')
-          return { error: err }
-        })
+        // Skip Edge Function and go directly to database update
+        // This is what the "Force activation" button does and it works
+        console.log('Using direct database update for immediate activation')
         
-        if (error) {
-          console.error('Force activation error:', error)
+        // Try up to 3 times with a small delay
+        let updateSuccess = false
+        let lastError = null
+        
+        for (let attempt = 1; attempt <= 3 && !updateSuccess; attempt++) {
+          console.log(`Activation attempt ${attempt}/3`)
           
-          // Fallback: Direct update (should work with RLS disabled)
-          console.log('Trying direct database update for:', activeUser.email)
-          const { error: updateError } = await supabase
+          // Method 1: Try updating by user ID (most reliable)
+          const { data: updateData, error: updateError } = await supabase
+            .from('user_profiles')
+            .update({ is_subscribed: true })
+            .eq('id', activeUser.id)
+            .select()
+            .single()
+          
+          if (!updateError) {
+            console.log('Subscription activated successfully:', updateData)
+            updateSuccess = true
+            break
+          }
+          
+          console.error(`Attempt ${attempt} failed:`, updateError)
+          lastError = updateError
+          
+          // If not the last attempt, wait a bit before retrying
+          if (attempt < 3) {
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          }
+        }
+        
+        // If all attempts with ID failed, try with email
+        if (!updateSuccess) {
+          console.log('All ID updates failed, trying email update...')
+          const { error: emailUpdateError } = await supabase
             .from('user_profiles')
             .update({ is_subscribed: true })
             .eq('email', activeUser.email)
           
-          if (updateError) {
-            console.error('Direct update error:', updateError)
-            throw new Error('Unable to activate subscription - please contact support')
+          if (emailUpdateError) {
+            console.error('Email update also failed:', emailUpdateError)
+            throw new Error('Unable to activate subscription after multiple attempts')
+          } else {
+            updateSuccess = true
           }
         }
         
