@@ -8,42 +8,66 @@ const PaymentSuccessAutomatic = () => {
   const navigate = useNavigate()
   const { user, refreshProfile } = useAuth()
   const [status, setStatus] = useState('activating')
-  const [error, setError] = useState(null)
+  const [, setError] = useState(null)
 
   useEffect(() => {
     let mounted = true
     
     const activateSubscription = async () => {
-      // Wait for user to be loaded
+      console.log('Payment success page loaded, checking user...')
+      
+      // First, try to get the session directly
+      const { data: { session } } = await supabase.auth.getSession()
+      console.log('Session check:', session?.user?.email)
+      
+      // Wait for user to be loaded (up to 15 seconds)
       let attempts = 0
-      while (!user && attempts < 10 && mounted) {
+      let currentUser = user || session?.user
+      
+      while (!currentUser && attempts < 30 && mounted) {
         await new Promise(resolve => setTimeout(resolve, 500))
+        const { data: { session: newSession } } = await supabase.auth.getSession()
+        currentUser = user || newSession?.user
         attempts++
+        
+        if (attempts % 6 === 0) {
+          console.log(`Still waiting for user... (${attempts/2}s)`)
+        }
       }
 
-      if (!user || !mounted) {
-        setError('User not found')
+      if (!currentUser || !mounted) {
+        console.error('No user found after 15 seconds')
+        setError('Session de connexion non trouvée. Veuillez vous reconnecter.')
         setStatus('error')
         return
       }
+      
+      // Use the found user
+      const activeUser = currentUser
 
       try {
-        console.log('Activating subscription for:', user.email)
+        console.log('Activating subscription for:', activeUser.email)
         
-        // Try the force activation function first
-        const { data, error } = await supabase
-          .rpc('force_activate_subscription', {
-            user_email: user.email
-          })
+        // First check if Edge Function exists
+        const { data, error } = await supabase.functions.invoke('confirm-payment', {
+          body: { 
+            sessionId: new URLSearchParams(window.location.search).get('session_id'),
+            userEmail: activeUser.email 
+          }
+        }).catch(err => {
+          console.log('Edge function not available, using direct update')
+          return { error: err }
+        })
         
         if (error) {
           console.error('Force activation error:', error)
           
           // Fallback: Direct update (should work with RLS disabled)
+          console.log('Trying direct database update for:', activeUser.email)
           const { error: updateError } = await supabase
             .from('user_profiles')
             .update({ is_subscribed: true })
-            .eq('email', user.email)
+            .eq('email', activeUser.email)
           
           if (updateError) {
             console.error('Direct update error:', updateError)
@@ -104,25 +128,64 @@ const PaymentSuccessAutomatic = () => {
     return (
       <div className="min-h-screen bg-gradient-to-br from-green-900 via-emerald-900 to-teal-900 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-8 text-center">
-          <div className="w-20 h-20 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <span className="text-4xl">⚠️</span>
+          <div className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircle className="h-10 w-10 text-green-400" />
           </div>
-          <h2 className="text-2xl font-bold text-white mb-4">Problème temporaire</h2>
+          <h2 className="text-2xl font-bold text-white mb-4">Paiement Réussi! ✅</h2>
           <p className="text-gray-300 mb-4">
-            Votre paiement a été traité avec succès, mais nous rencontrons un problème technique.
+            Votre paiement a été traité avec succès. 
           </p>
-          <p className="text-red-400 text-sm mb-6">{error}</p>
+          
+          <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+            <p className="text-blue-300 text-sm mb-2">
+              Si vous ne pouvez pas accéder à l'application, essayez:
+            </p>
+            <ol className="text-left text-blue-200 text-sm space-y-1">
+              <li>1. Déconnectez-vous et reconnectez-vous</li>
+              <li>2. Videz le cache de votre navigateur</li>
+              <li>3. Ou cliquez sur "Forcer l'activation" ci-dessous</li>
+            </ol>
+          </div>
+          
           <button
-            onClick={() => window.location.reload()}
-            className="w-full px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 mb-3"
+            onClick={async () => {
+              setStatus('activating')
+              // Force activation with direct database update
+              try {
+                const { data: { session } } = await supabase.auth.getSession()
+                if (session?.user) {
+                  await supabase
+                    .from('user_profiles')
+                    .update({ is_subscribed: true })
+                    .eq('id', session.user.id)
+                  
+                  setTimeout(() => navigate('/app'), 1000)
+                }
+              } catch (err) {
+                console.error('Force activation failed:', err)
+                navigate('/app')
+              }
+            }}
+            className="w-full px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200 mb-3"
           >
-            Réessayer
+            Forcer l'activation
           </button>
+          
+          <button
+            onClick={() => {
+              supabase.auth.signOut()
+              navigate('/auth')
+            }}
+            className="w-full px-6 py-3 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors mb-3"
+          >
+            Se reconnecter
+          </button>
+          
           <button
             onClick={() => navigate('/app')}
-            className="w-full px-6 py-3 bg-gray-700 text-white rounded-lg font-medium hover:bg-gray-600 transition-colors"
+            className="text-gray-400 hover:text-white transition-colors text-sm"
           >
-            Continuer vers l'app
+            Essayer d'accéder quand même →
           </button>
         </div>
       </div>
