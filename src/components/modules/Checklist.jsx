@@ -891,7 +891,7 @@ const Checklist = ({
             </p>
             <div className="flex space-x-3">
               <button
-                onClick={() => handleCloseTradeWithResult('profit')}
+                onClick={() => handleCloseTradeWithResult('win')}
                 className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium flex items-center justify-center space-x-2"
               >
                 <TrendingUp className="w-5 h-5" />
@@ -1002,11 +1002,11 @@ const Checklist = ({
                       </td>
                       <td className="px-3 py-3">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                          trade.trade_result === 'profit'
+                          trade.trade_result === 'win'
                             ? 'bg-green-100 text-green-700'
                             : 'bg-red-100 text-red-700'
                         }`}>
-                          {trade.trade_result === 'profit' ? 'Profit' : 'Perte'}
+                          {trade.trade_result === 'win' ? 'Profit' : 'Perte'}
                         </span>
                       </td>
                       <td className="px-3 py-3">
@@ -1049,13 +1049,13 @@ const Checklist = ({
                   </div>
                   <span className="text-3xl font-bold text-green-900">
                     {completedTrades.length > 0 
-                      ? Math.round((completedTrades.filter(t => t.trade_result === 'profit').length / completedTrades.length) * 100)
+                      ? Math.round((completedTrades.filter(t => t.trade_result === 'win').length / completedTrades.length) * 100)
                       : 0}%
                   </span>
                 </div>
                 <h3 className="text-sm font-medium text-green-700">Taux de Réussite</h3>
                 <p className="text-xs text-green-600 mt-1">
-                  {completedTrades.filter(t => t.trade_result === 'profit').length} gains / {completedTrades.filter(t => t.trade_result === 'loss').length} pertes
+                  {completedTrades.filter(t => t.trade_result === 'win').length} gains / {completedTrades.filter(t => t.trade_result === 'loss').length} pertes
                 </p>
               </div>
 
@@ -1111,7 +1111,7 @@ const Checklist = ({
                     const tradesInRange = completedTrades.filter(t => 
                       t.entry_score >= range.min && t.entry_score <= range.max
                     );
-                    const wins = tradesInRange.filter(t => t.trade_result === 'profit').length;
+                    const wins = tradesInRange.filter(t => t.trade_result === 'win').length;
                     const total = tradesInRange.length;
                     const winRate = total > 0 ? Math.round((wins / total) * 100) : 0;
                     
@@ -1179,7 +1179,7 @@ const Checklist = ({
                   acc[symbol] = { total: 0, wins: 0, totalDuration: 0 };
                 }
                 acc[symbol].total++;
-                if (trade.trade_result === 'profit') acc[symbol].wins++;
+                if (trade.trade_result === 'win') acc[symbol].wins++;
                 acc[symbol].totalDuration += trade.duration_seconds || 0;
                 return acc;
               }, {});

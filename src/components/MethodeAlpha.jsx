@@ -1307,6 +1307,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               userSettings={userSettings}
               checklistSessions={checklistSessions}
               activeTrade={activeTrade}
+              completedTrades={completedTrades}
             />
           )}
 

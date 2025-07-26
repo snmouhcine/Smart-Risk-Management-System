@@ -56,7 +56,8 @@ const AdvancedAnalytics = ({
   tradingJournal,
   userSettings,
   checklistSessions,
-  activeTrade
+  activeTrade,
+  completedTrades = []
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState('all');
   const [selectedMetric, setSelectedMetric] = useState('balance');
@@ -236,9 +237,11 @@ const AdvancedAnalytics = ({
 
   // Process checklist performance data
   const checklistPerformance = useMemo(() => {
-    if (!checklistSessions || !tradingJournal) return [];
+    if (!completedTrades || completedTrades.length === 0) return [];
 
-    // Group sessions by score ranges
+    console.log('Processing completed trades:', completedTrades);
+
+    // Group trades by entry score ranges
     const scoreRanges = [
       { min: 85, max: 100, label: 'Excellent (85-100%)', color: '#10b981' },
       { min: 70, max: 84, label: 'Bon (70-84%)', color: '#3b82f6' },
@@ -247,49 +250,37 @@ const AdvancedAnalytics = ({
     ];
 
     const performance = scoreRanges.map(range => {
-      const sessions = checklistSessions.filter(s => 
-        s.type === 'entry' && 
-        s.total_score >= range.min && 
-        s.total_score <= range.max
+      const trades = completedTrades.filter(trade => 
+        trade.entry_score >= range.min && 
+        trade.entry_score <= range.max
       );
 
-      // Calculate P&L for trades in this score range
-      let totalPnL = 0;
-      let tradeCount = 0;
+      // Calculate win rate
       let wins = 0;
-
-      sessions.forEach(session => {
-        const tradeDate = new Date(session.created_at).toISOString().split('T')[0];
-        const journalEntry = tradingJournal[tradeDate];
-        if (journalEntry && journalEntry.hasTraded) {
-          const pnl = parseFloat(journalEntry.pnl) || 0;
-          totalPnL += pnl;
-          tradeCount++;
-          if (pnl > 0) wins++;
-        }
+      trades.forEach(trade => {
+        console.log('Trade result:', trade.trade_result, 'Entry score:', trade.entry_score);
+        if (trade.trade_result === 'win') wins++;
       });
 
       return {
         range: range.label,
         color: range.color,
-        sessions: sessions.length,
-        trades: tradeCount,
-        totalPnL,
-        avgPnL: tradeCount > 0 ? totalPnL / tradeCount : 0,
-        winRate: tradeCount > 0 ? (wins / tradeCount) * 100 : 0
+        trades: trades.length,
+        winRate: trades.length > 0 ? (wins / trades.length) * 100 : 0
       };
     });
 
     return performance;
-  }, [checklistSessions, tradingJournal]);
+  }, [completedTrades]);
 
   // Trading patterns analysis
   const tradingPatterns = useMemo(() => {
     if (!tradingJournal) return { byDayOfWeek: [], byHour: [] };
 
-    const dayNames = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-    const byDayOfWeek = Array(7).fill(null).map((_, i) => ({
-      day: dayNames[i],
+    const dayNames = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi'];
+    const dayIndices = [1, 2, 3, 4, 5]; // Monday to Friday
+    const byDayOfWeek = dayNames.map((dayName, i) => ({
+      day: dayName,
       trades: 0,
       totalPnL: 0,
       winRate: 0
@@ -298,16 +289,21 @@ const AdvancedAnalytics = ({
     Object.entries(tradingJournal).forEach(([date, entry]) => {
       if (entry.hasTraded) {
         const dayIndex = new Date(date).getDay();
-        byDayOfWeek[dayIndex].trades++;
-        byDayOfWeek[dayIndex].totalPnL += parseFloat(entry.pnl) || 0;
+        // Only process weekdays (1-5)
+        if (dayIndex >= 1 && dayIndex <= 5) {
+          const arrayIndex = dayIndex - 1; // Convert to 0-based array index
+          byDayOfWeek[arrayIndex].trades++;
+          byDayOfWeek[arrayIndex].totalPnL += parseFloat(entry.pnl) || 0;
+        }
       }
     });
 
     // Calculate win rates
-    byDayOfWeek.forEach(day => {
+    byDayOfWeek.forEach((day, index) => {
       if (day.trades > 0) {
+        const dayIndex = index + 1; // Convert back to day index (1-5)
         const wins = Object.entries(tradingJournal).filter(([date, entry]) => {
-          return new Date(date).getDay() === dayNames.indexOf(day.day) &&
+          return new Date(date).getDay() === dayIndex &&
                  entry.hasTraded &&
                  parseFloat(entry.pnl) > 0;
         }).length;
@@ -697,183 +693,634 @@ const AdvancedAnalytics = ({
         </div>
       </div>
 
-      {/* Performance by Checklist Score */}
+      {/* Performance by Checklist Score - Custom Beautiful Design */}
       {checklistPerformance.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 p-6 rounded-2xl shadow-lg border border-purple-100">
             <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center">
-              <CheckCircle2 className="w-5 h-5 mr-2 text-purple-600" />
+              <div className="p-2 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg mr-3">
+                <CheckCircle2 className="w-5 h-5 text-white" />
+              </div>
               Performance par Score de Checklist
             </h3>
             
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={checklistPerformance}>
-                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                  <XAxis 
-                    dataKey="range" 
-                    tick={{ fontSize: 11 }}
-                    angle={-20}
-                    textAnchor="end"
-                    height={80}
-                  />
-                  <YAxis tick={{ fontSize: 12 }} />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload[0]) {
-                        const data = payload[0].payload;
-                        return (
-                          <div className="bg-white p-3 rounded-lg shadow-lg border border-slate-200">
-                            <p className="font-semibold text-sm">{data.range}</p>
-                            <p className="text-xs mt-1">Sessions: {data.sessions}</p>
-                            <p className="text-xs">Trades: {data.trades}</p>
-                            <p className="text-xs">P&L Total: {formatCurrency(data.totalPnL)}</p>
-                            <p className="text-xs">Taux de Réussite: {formatPercentage(data.winRate)}</p>
+            <div className="space-y-4">
+              {checklistPerformance.map((perf, index) => {
+                // Calculate bar widths
+                const maxTrades = Math.max(...checklistPerformance.map(p => p.trades), 1);
+                const tradeBarWidth = (perf.trades / maxTrades) * 100;
+                const winRateWidth = perf.winRate;
+                
+                return (
+                  <div key={index} className="relative">
+                    {/* Score Range Label */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center">
+                        <div 
+                          className="w-3 h-3 rounded-full mr-2"
+                          style={{ backgroundColor: perf.color }}
+                        />
+                        <span className="text-sm font-medium text-slate-700">{perf.range}</span>
+                      </div>
+                      <div className="flex items-center space-x-4 text-xs">
+                        <span className="text-slate-600">{perf.trades} trades</span>
+                        <span className="font-semibold" style={{ color: perf.color }}>
+                          {perf.winRate.toFixed(1)}% réussite
+                        </span>
+                      </div>
+                    </div>
+                    
+                    {/* Custom Progress Bars */}
+                    <div className="space-y-2">
+                      {/* Trades Bar */}
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-500">Nombre de trades</span>
+                        </div>
+                        <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden"
+                            style={{ 
+                              width: `${tradeBarWidth}%`,
+                              backgroundColor: perf.color,
+                              opacity: 0.7
+                            }}
+                          >
+                            {/* Animated shimmer effect */}
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white to-transparent opacity-30 -translate-x-full animate-[shimmer_2s_infinite]" />
                           </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="avgPnL" name="P&L Moyen">
-                    {checklistPerformance.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+                        </div>
+                      </div>
+                      
+                      {/* Win Rate Bar */}
+                      <div className="relative">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs text-slate-500">Taux de réussite</span>
+                        </div>
+                        <div className="h-6 bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full rounded-full transition-all duration-1000 ease-out relative overflow-hidden flex items-center justify-end pr-2"
+                            style={{ 
+                              width: `${winRateWidth}%`,
+                              background: `linear-gradient(90deg, ${perf.color}88, ${perf.color})`
+                            }}
+                          >
+                            {perf.winRate > 20 && (
+                              <span className="text-xs font-semibold text-white">
+                                {perf.winRate.toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Summary Stats */}
+              <div className="mt-6 pt-4 border-t border-purple-100">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg">
+                    <p className="text-2xl font-bold text-purple-700">
+                      {checklistPerformance.reduce((sum, p) => sum + p.trades, 0)}
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">Total Trades</p>
+                  </div>
+                  <div className="text-center p-3 bg-gradient-to-br from-green-100 to-emerald-100 rounded-lg">
+                    <p className="text-2xl font-bold text-green-700">
+                      {checklistPerformance.length > 0 
+                        ? (checklistPerformance.reduce((sum, p) => sum + (p.winRate * p.trades), 0) / 
+                           checklistPerformance.reduce((sum, p) => sum + p.trades, 0) || 0).toFixed(1)
+                        : '0'}%
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">Taux Global</p>
+                  </div>
+                </div>
+              </div>
             </div>
+            
+            {/* Add shimmer animation keyframes */}
+            <style dangerouslySetInnerHTML={{__html: `
+              @keyframes shimmer {
+                to {
+                  transform: translateX(100%);
+                }
+              }
+            `}} />
           </div>
 
-          {/* Trading Patterns */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+          {/* Trading Patterns - Enhanced Custom Design */}
+          <div className="bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-6 rounded-2xl shadow-lg border border-indigo-100">
             <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center">
-              <Calendar className="w-5 h-5 mr-2 text-purple-600" />
+              <div className="p-2 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg mr-3">
+                <Calendar className="w-5 h-5 text-white" />
+              </div>
               Patterns de Trading par Jour
             </h3>
             
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <RadarChart data={tradingPatterns.byDayOfWeek}>
-                  <PolarGrid stroke="#e5e7eb" />
-                  <PolarAngleAxis dataKey="day" tick={{ fontSize: 12 }} />
-                  <PolarRadiusAxis 
-                    angle={90} 
-                    domain={[0, 100]} 
-                    tick={{ fontSize: 10 }}
-                  />
-                  <Radar 
-                    name="Taux de Réussite" 
-                    dataKey="winRate" 
-                    stroke="#8b5cf6" 
-                    fill="#8b5cf6" 
-                    fillOpacity={0.6}
-                  />
-                  <Radar 
-                    name="Nombre de Trades" 
-                    dataKey="trades" 
-                    stroke="#10b981" 
-                    fill="#10b981" 
-                    fillOpacity={0.3}
-                  />
-                  <Legend />
-                </RadarChart>
-              </ResponsiveContainer>
+            {/* Enhanced Day Analysis */}
+            <div className="space-y-4">
+              {/* Best/Worst Day Summary */}
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                {(() => {
+                  const sortedByWinRate = [...tradingPatterns.byDayOfWeek]
+                    .filter(d => d.trades > 0)
+                    .sort((a, b) => b.winRate - a.winRate);
+                  const bestDay = sortedByWinRate[0];
+                  const worstDay = sortedByWinRate[sortedByWinRate.length - 1];
+                  
+                  return (
+                    <>
+                      {bestDay && (
+                        <div className="bg-gradient-to-br from-green-50 to-emerald-100 p-3 rounded-xl border border-green-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-green-700">Meilleur Jour</span>
+                            <Award className="w-4 h-4 text-green-600" />
+                          </div>
+                          <p className="text-lg font-bold text-green-900">{bestDay.day}</p>
+                          <p className="text-xs text-green-600">{bestDay.winRate.toFixed(0)}% réussite</p>
+                        </div>
+                      )}
+                      {worstDay && (
+                        <div className="bg-gradient-to-br from-red-50 to-orange-100 p-3 rounded-xl border border-red-200">
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs font-medium text-red-700">Jour à Éviter</span>
+                            <AlertTriangle className="w-4 h-4 text-red-600" />
+                          </div>
+                          <p className="text-lg font-bold text-red-900">{worstDay.day}</p>
+                          <p className="text-xs text-red-600">{worstDay.winRate.toFixed(0)}% réussite</p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+              
+              {/* Detailed Day-by-Day Analysis */}
+              <div className="space-y-3">
+                {tradingPatterns.byDayOfWeek.map((dayData, index) => {
+                  const maxTrades = Math.max(...tradingPatterns.byDayOfWeek.map(d => d.trades), 1);
+                  
+                  return (
+                    <div 
+                      key={dayData.day}
+                      className="relative p-4 rounded-xl border bg-white border-slate-200 transition-all hover:shadow-md"
+                    >
+                      {/* Day Header */}
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+                            dayData.winRate >= 70 ? 'bg-green-100 text-green-700' :
+                            dayData.winRate >= 50 ? 'bg-blue-100 text-blue-700' :
+                            dayData.winRate >= 30 ? 'bg-orange-100 text-orange-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {dayData.day.substring(0, 3).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-slate-800">{dayData.day}</p>
+                            <p className="text-xs text-slate-500">
+                              {dayData.trades} {dayData.trades === 1 ? 'trade' : 'trades'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Win Rate Badge */}
+                        <div className="text-right">
+                          <div className={`text-2xl font-bold ${
+                            dayData.winRate >= 50 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {dayData.trades > 0 ? `${dayData.winRate.toFixed(0)}%` : '-'}
+                          </div>
+                          <p className="text-xs text-slate-500">Win Rate</p>
+                        </div>
+                      </div>
+                      
+                      {/* Visual Bars */}
+                      {dayData.trades > 0 && (
+                        <div className="space-y-2">
+                          {/* Trade Volume Bar */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-slate-500">Volume</span>
+                              <span className="text-xs text-slate-600">{dayData.trades} trades</span>
+                            </div>
+                            <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-gradient-to-r from-indigo-400 to-purple-500 rounded-full transition-all duration-1000"
+                                style={{ width: `${(dayData.trades / maxTrades) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* Win/Loss Breakdown */}
+                          <div>
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-slate-500">Gains vs Pertes</span>
+                              <span className="text-xs text-slate-600">
+                                {Math.round(dayData.trades * dayData.winRate / 100)}W / 
+                                {Math.round(dayData.trades * (100 - dayData.winRate) / 100)}L
+                              </span>
+                            </div>
+                            <div className="h-2 bg-red-200 rounded-full overflow-hidden flex">
+                              <div 
+                                className="h-full bg-gradient-to-r from-green-400 to-green-600 transition-all duration-1000"
+                                style={{ width: `${dayData.winRate}%` }}
+                              />
+                            </div>
+                          </div>
+                          
+                          {/* P&L Indicator */}
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-slate-500">P&L Total</span>
+                            <div className={`flex items-center space-x-1 ${
+                              dayData.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {dayData.totalPnL >= 0 ? (
+                                <TrendingUp className="w-3 h-3" />
+                              ) : (
+                                <TrendingDown className="w-3 h-3" />
+                              )}
+                              <span className="text-sm font-semibold">
+                                {formatCurrency(dayData.totalPnL)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* No trades indicator */}
+                      {dayData.trades === 0 && (
+                        <div className="text-center py-2">
+                          <p className="text-xs text-slate-400">Aucun trade ce jour</p>
+                        </div>
+                      )}
+                      
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Weekly Summary Stats */}
+              <div className="mt-6 p-4 bg-gradient-to-r from-purple-100 to-indigo-100 rounded-xl">
+                <h4 className="text-sm font-semibold text-purple-800 mb-3 flex items-center">
+                  <Activity className="w-4 h-4 mr-1" />
+                  Résumé Hebdomadaire
+                </h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-700">
+                      {tradingPatterns.byDayOfWeek.reduce((sum, d) => sum + d.trades, 0)}
+                    </p>
+                    <p className="text-xs text-purple-600">Trades/Semaine</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-700">
+                      {tradingPatterns.byDayOfWeek.filter(d => d.trades > 0).length}
+                    </p>
+                    <p className="text-xs text-purple-600">Jours Actifs</p>
+                  </div>
+                  <div className="text-center">
+                    <p className={`text-2xl font-bold ${
+                      tradingPatterns.byDayOfWeek.reduce((sum, d) => sum + d.totalPnL, 0) >= 0 
+                        ? 'text-green-600' 
+                        : 'text-red-600'
+                    }`}>
+                      {formatCurrency(tradingPatterns.byDayOfWeek.reduce((sum, d) => sum + d.totalPnL, 0))}
+                    </p>
+                    <p className="text-xs text-purple-600">P&L Hebdo</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-2xl font-bold text-purple-700">
+                      {(() => {
+                        const totalTrades = tradingPatterns.byDayOfWeek.reduce((sum, d) => sum + d.trades, 0);
+                        const totalWins = tradingPatterns.byDayOfWeek.reduce((sum, d) => 
+                          sum + Math.round(d.trades * d.winRate / 100), 0
+                        );
+                        return totalTrades > 0 ? Math.round((totalWins / totalTrades) * 100) : 0;
+                      })()}%
+                    </p>
+                    <p className="text-xs text-purple-600">Win Rate Global</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Advanced Statistics */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-        <h3 className="text-lg font-semibold text-slate-900 mb-6 flex items-center">
-          <Brain className="w-5 h-5 mr-2 text-purple-600" />
+      {/* Advanced Statistics - Custom Beautiful Design */}
+      <div className="bg-gradient-to-br from-slate-50 via-white to-purple-50 p-8 rounded-2xl shadow-xl border border-purple-100">
+        <h3 className="text-xl font-bold text-slate-900 mb-8 flex items-center">
+          <div className="p-2 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-lg mr-3">
+            <Brain className="w-6 h-6 text-white" />
+          </div>
           Statistiques Avancées
         </h3>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Win/Loss Distribution */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-slate-700">Distribution Gains/Pertes</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Meilleur Trade</span>
-                <span className="text-sm font-bold text-green-600">{formatCurrency(kpis.bestTrade)}</span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {/* Win/Loss Distribution - Visual Card */}
+          <div className="relative overflow-hidden bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-green-100 to-red-100 rounded-full blur-2xl opacity-20" />
+            
+            <div className="relative">
+              <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center">
+                <div className="w-8 h-1 bg-gradient-to-r from-green-500 to-red-500 rounded-full mr-2" />
+                Distribution Gains/Pertes
+              </h4>
+              
+              {/* Visual representation of best/worst trades */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-500">Amplitude des trades</span>
+                </div>
+                <div className="relative h-12 bg-slate-100 rounded-lg overflow-hidden">
+                  {/* Center line */}
+                  <div className="absolute top-0 bottom-0 left-1/2 w-px bg-slate-400" />
+                  
+                  {/* Best trade bar */}
+                  {kpis.bestTrade > 0 && (
+                    <div 
+                      className="absolute top-1 bottom-1 left-1/2 bg-gradient-to-r from-green-400 to-green-600 rounded-r-md"
+                      style={{ width: `${Math.min((kpis.bestTrade / (kpis.bestTrade + Math.abs(kpis.worstTrade))) * 50, 45)}%` }}
+                    >
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs font-bold text-white">
+                        +{kpis.bestTrade}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Worst trade bar */}
+                  {kpis.worstTrade < 0 && (
+                    <div 
+                      className="absolute top-1 bottom-1 right-1/2 bg-gradient-to-l from-red-400 to-red-600 rounded-l-md"
+                      style={{ width: `${Math.min((Math.abs(kpis.worstTrade) / (kpis.bestTrade + Math.abs(kpis.worstTrade))) * 50, 45)}%` }}
+                    >
+                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-bold text-white">
+                        {kpis.worstTrade}
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Pire Trade</span>
-                <span className="text-sm font-bold text-red-600">{formatCurrency(kpis.worstTrade)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">P&L Moyen par Trade</span>
-                <span className={`text-sm font-bold ${kpis.avgDailyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(kpis.avgDailyPnL)}
-                </span>
+              
+              {/* Stats details */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-green-800">Meilleur Trade</span>
+                  </div>
+                  <span className="text-lg font-bold text-green-700">{formatCurrency(kpis.bestTrade)}</span>
+                </div>
+                
+                <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-red-800">Pire Trade</span>
+                  </div>
+                  <span className="text-lg font-bold text-red-700">{formatCurrency(kpis.worstTrade)}</span>
+                </div>
+                
+                <div className={`flex items-center justify-between p-3 rounded-lg ${
+                  kpis.avgDailyPnL >= 0 ? 'bg-blue-50' : 'bg-orange-50'
+                }`}>
+                  <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${
+                      kpis.avgDailyPnL >= 0 ? 'bg-blue-500' : 'bg-orange-500'
+                    }`} />
+                    <span className={`text-sm ${
+                      kpis.avgDailyPnL >= 0 ? 'text-blue-800' : 'text-orange-800'
+                    }`}>P&L Moyen</span>
+                  </div>
+                  <span className={`text-lg font-bold ${
+                    kpis.avgDailyPnL >= 0 ? 'text-blue-700' : 'text-orange-700'
+                  }`}>
+                    {formatCurrency(kpis.avgDailyPnL)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Consecutive Trades */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-slate-700">Séries Consécutives</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="text-sm text-slate-600">Gains Consécutifs Max</span>
-                  <InfoTooltip id="consecutiveWins" />
+          {/* Consecutive Trades - Visual Streaks */}
+          <div className="relative overflow-hidden bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full blur-2xl opacity-20" />
+            
+            <div className="relative">
+              <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center">
+                <div className="w-8 h-1 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full mr-2" />
+                Séries Consécutives
+              </h4>
+              
+              {/* Visual streak representation */}
+              <div className="mb-6">
+                {/* Win streak */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-green-600 font-medium">Série de gains</span>
+                    <span className="text-2xl font-bold text-green-600">{kpis.consecutiveWins}</span>
+                  </div>
+                  <div className="flex space-x-1">
+                    {[...Array(Math.min(kpis.consecutiveWins, 10))].map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="flex-1 h-3 bg-gradient-to-t from-green-500 to-green-400 rounded-full animate-pulse"
+                        style={{ animationDelay: `${i * 100}ms` }}
+                      />
+                    ))}
+                    {kpis.consecutiveWins > 10 && (
+                      <span className="text-xs text-green-600 font-bold">+{kpis.consecutiveWins - 10}</span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-sm font-bold text-green-600">{kpis.consecutiveWins}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="text-sm text-slate-600">Pertes Consécutives Max</span>
-                  <InfoTooltip id="consecutiveLosses" />
+                
+                {/* Loss streak */}
+                <div className="mb-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-red-600 font-medium">Série de pertes</span>
+                    <span className="text-2xl font-bold text-red-600">{kpis.consecutiveLosses}</span>
+                  </div>
+                  <div className="flex space-x-1">
+                    {[...Array(Math.min(kpis.consecutiveLosses, 10))].map((_, i) => (
+                      <div 
+                        key={i} 
+                        className="flex-1 h-3 bg-gradient-to-t from-red-500 to-red-400 rounded-full animate-pulse"
+                        style={{ animationDelay: `${i * 100}ms` }}
+                      />
+                    ))}
+                    {kpis.consecutiveLosses > 10 && (
+                      <span className="text-xs text-red-600 font-bold">+{kpis.consecutiveLosses - 10}</span>
+                    )}
+                  </div>
                 </div>
-                <span className="text-sm font-bold text-red-600">{kpis.consecutiveLosses}</span>
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Trades Total</span>
-                <span className="text-sm font-bold text-slate-700">{kpis.totalTrades}</span>
+              
+              {/* Total trades circular indicator */}
+              <div className="relative mt-6">
+                <div className="flex items-center justify-center">
+                  <div className="relative">
+                    <svg className="w-32 h-32 transform -rotate-90">
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="#e5e7eb"
+                        strokeWidth="8"
+                        fill="none"
+                      />
+                      <circle
+                        cx="64"
+                        cy="64"
+                        r="56"
+                        stroke="url(#purpleGradient)"
+                        strokeWidth="8"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeDasharray={`${(kpis.winningTrades / Math.max(kpis.totalTrades, 1)) * 352} 352`}
+                        className="transition-all duration-1000"
+                      />
+                      <defs>
+                        <linearGradient id="purpleGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#8b5cf6" />
+                          <stop offset="100%" stopColor="#ec4899" />
+                        </linearGradient>
+                      </defs>
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="text-3xl font-bold text-slate-800">{kpis.totalTrades}</span>
+                      <span className="text-xs text-slate-500">trades total</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-center space-x-4 mt-4">
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 bg-green-500 rounded-full" />
+                    <span className="text-xs text-slate-600">{kpis.winningTrades} gains</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <div className="w-3 h-3 bg-red-500 rounded-full" />
+                    <span className="text-xs text-slate-600">{kpis.losingTrades} pertes</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Risk Metrics */}
-          <div className="space-y-4">
-            <h4 className="text-sm font-semibold text-slate-700">Métriques de Risque</h4>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-600">Ratio Gain/Perte</span>
-                <span className="text-sm font-bold text-purple-600">
-                  {kpis.avgLoss > 0 ? (kpis.avgWin / kpis.avgLoss).toFixed(2) : '∞'}
-                </span>
+          {/* Risk Metrics - Visual Gauges */}
+          <div className="relative overflow-hidden bg-white rounded-2xl shadow-lg border border-slate-100 p-6">
+            {/* Background decoration */}
+            <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-indigo-100 to-blue-100 rounded-full blur-2xl opacity-20" />
+            
+            <div className="relative">
+              <h4 className="text-sm font-bold text-slate-800 mb-4 flex items-center">
+                <div className="w-8 h-1 bg-gradient-to-r from-indigo-500 to-blue-500 rounded-full mr-2" />
+                Métriques de Risque
+              </h4>
+              
+              {/* Risk/Reward Ratio Visual */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs text-slate-600">Ratio Gain/Perte</span>
+                  <span className="text-2xl font-bold text-indigo-600">
+                    {kpis.avgLoss > 0 ? (kpis.avgWin / kpis.avgLoss).toFixed(2) : '∞'}:1
+                  </span>
+                </div>
+                
+                {/* Visual ratio bar */}
+                <div className="relative h-8 bg-slate-100 rounded-lg overflow-hidden">
+                  <div className="absolute inset-y-0 left-0 right-0 flex">
+                    <div 
+                      className="bg-gradient-to-r from-red-400 to-red-500 flex items-center justify-center"
+                      style={{ width: kpis.avgLoss > 0 ? '33.33%' : '0%' }}
+                    >
+                      <span className="text-xs font-bold text-white">1</span>
+                    </div>
+                    <div 
+                      className="bg-gradient-to-r from-green-400 to-green-600 flex items-center justify-center"
+                      style={{ width: kpis.avgLoss > 0 ? `${Math.min(66.66 * (kpis.avgWin / kpis.avgLoss), 66.66)}%` : '66.66%' }}
+                    >
+                      <span className="text-xs font-bold text-white">
+                        {kpis.avgLoss > 0 ? (kpis.avgWin / kpis.avgLoss).toFixed(1) : '∞'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="text-sm text-slate-600">Expectancy</span>
-                  <InfoTooltip id="expectancy" />
+              
+              {/* Expectancy Meter */}
+              <div className="mb-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <span className="text-xs text-slate-600">Expectancy</span>
+                    <InfoTooltip id="expectancy" />
+                  </div>
+                  <span className={`text-lg font-bold ${kpis.avgDailyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {formatCurrency(kpis.avgDailyPnL)}
+                  </span>
                 </div>
-                <span className={`text-sm font-bold ${kpis.avgDailyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(kpis.avgDailyPnL)}
-                </span>
+                
+                {/* Expectancy gauge */}
+                <div className="relative h-4 bg-slate-200 rounded-full overflow-hidden">
+                  <div 
+                    className={`absolute left-0 top-0 bottom-0 rounded-full transition-all duration-1000 ${
+                      kpis.avgDailyPnL >= 0 
+                        ? 'bg-gradient-to-r from-green-400 to-green-600' 
+                        : 'bg-gradient-to-r from-red-600 to-red-400'
+                    }`}
+                    style={{ 
+                      width: `${Math.min(Math.abs(kpis.avgDailyPnL) / 100 * 100, 100)}%` 
+                    }}
+                  />
+                </div>
               </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <span className="text-sm text-slate-600">Score de Risque</span>
-                  <InfoTooltip id="riskScore" />
+              
+              {/* Risk Score Stars */}
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center">
+                    <span className="text-xs text-slate-600">Score de Risque</span>
+                    <InfoTooltip id="riskScore" />
+                  </div>
                 </div>
-                <div className="flex items-center space-x-1">
-                  {[1, 2, 3, 4, 5].map(i => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${
-                        i <= Math.min(5, Math.max(1, 5 - Math.floor(kpis.maxDrawdown / 10)))
-                          ? 'bg-green-500'
-                          : 'bg-slate-300'
-                      }`}
-                    />
-                  ))}
+                
+                <div className="flex items-center space-x-2">
+                  {[1, 2, 3, 4, 5].map(i => {
+                    const filled = i <= Math.min(5, Math.max(1, 5 - Math.floor(kpis.maxDrawdown / 10)));
+                    return (
+                      <div key={i} className="relative">
+                        <Shield 
+                          className={`w-8 h-8 transition-all duration-500 ${
+                            filled 
+                              ? 'text-indigo-500 fill-indigo-100' 
+                              : 'text-slate-300'
+                          }`}
+                          style={{ 
+                            transform: filled ? 'scale(1.1)' : 'scale(1)',
+                            animationDelay: `${i * 100}ms`
+                          }}
+                        />
+                        {filled && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
+                
+                <p className="text-xs text-slate-500 mt-2">
+                  {Math.min(5, Math.max(1, 5 - Math.floor(kpis.maxDrawdown / 10))) >= 4 
+                    ? 'Excellent contrôle du risque' 
+                    : Math.min(5, Math.max(1, 5 - Math.floor(kpis.maxDrawdown / 10))) >= 2
+                    ? 'Risque modéré'
+                    : 'Risque élevé - Attention!'}
+                </p>
               </div>
             </div>
           </div>
