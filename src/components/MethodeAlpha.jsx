@@ -20,7 +20,7 @@ import Checklist from './modules/Checklist';
 import AdvancedAnalytics from './modules/AdvancedAnalytics';
 
 const MethodeAlpha = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, isAdmin } = useAuth();
   const navigate = useNavigate();
   const { 
     loading: dataLoading, 
@@ -1190,6 +1190,16 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               </div>
               <span className="text-sm font-medium text-slate-700">{user?.email}</span>
             </div>
+            
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin')}
+                className="flex items-center space-x-2 px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-colors text-sm"
+              >
+                <Shield className="w-4 h-4" />
+                <span>Administration</span>
+              </button>
+            )}
             
             <button
               onClick={() => {

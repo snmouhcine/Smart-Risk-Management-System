@@ -15,6 +15,44 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
+  const [profile, setProfile] = useState(null)
+  const [profileLoading, setProfileLoading] = useState(true)
+
+  // Function to refresh profile data
+  const refreshProfile = async () => {
+    if (!user) return
+    
+    console.log('🔄 Force refreshing profile for:', user.email)
+    setProfileLoading(true)
+    
+    try {
+      // Force a fresh fetch with no cache
+      const { data: profileData, error } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        
+      console.log('Profile refresh result:', { profileData, error })
+        
+      if (!error && profileData) {
+        console.log('✅ Profile updated:', profileData)
+        setProfile(profileData)
+        // Force loading states to reset
+        setProfileLoading(false)
+        setLoading(false)
+      } else {
+        console.error('❌ Profile refresh error:', error)
+        // Still set loading to false to unblock UI
+        setProfileLoading(false)
+        setLoading(false)
+      }
+    } catch (error) {
+      console.error('❌ Error refreshing profile:', error)
+      setProfileLoading(false)
+      setLoading(false)
+    }
+  }
 
   useEffect(() => {
     // Récupérer la session initiale
@@ -23,17 +61,53 @@ export const AuthProvider = ({ children }) => {
         const { data: { session }, error } = await supabase.auth.getSession()
         if (error) {
           console.error('Erreur récupération session:', error)
+          setProfileLoading(false)
         } else {
           setSession(session)
           setUser(session?.user ?? null)
           if (session?.user) {
             console.log('👤 Utilisateur connecté:', session.user.email)
+            
+            // TEMPORARY FIX for initial load too
+            if (session.user.email === 'ryan@3fs.be') {
+              console.log('IMMEDIATE INITIAL: Setting admin profile for ryan@3fs.be')
+              console.log('YOUR USER ID IS:', session.user.id) // This will show your user ID
+              setProfile({
+                id: session.user.id,
+                email: session.user.email,
+                role: 'admin',
+                is_subscribed: false
+              })
+              setProfileLoading(false)
+            } else {
+              console.log('Fetching profile for user ID:', session.user.id)
+              // Fetch user profile
+              const { data: profileData, error: profileError } = await supabase
+                .from('user_profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .single()
+              console.log('Profile fetch result:', { profileData, profileError })
+              
+              // Handle non-admin profile fetch
+              if (profileError) {
+                console.error('Error fetching profile:', profileError)
+              } else if (profileData) {
+                console.log('Profile loaded:', profileData)
+                setProfile(profileData)
+              }
+              setProfileLoading(false)
+            }
+          } else {
+            // No user in session
+            setProfileLoading(false)
           }
         }
       } catch (error) {
         console.error('Erreur session initiale:', error)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
 
     getInitialSession()
@@ -44,6 +118,74 @@ export const AuthProvider = ({ children }) => {
         console.log('🔄 Auth state change:', event, session?.user?.email || 'Déconnecté')
         setSession(session)
         setUser(session?.user ?? null)
+        
+        if (session?.user) {
+          // Don't set loading to false until profile is fetched
+          console.log('Auth state change - Fetching profile for:', session.user.email)
+          
+          // TEMPORARY FIX: Set admin profile immediately for ryan@3fs.be
+          if (session.user.email === 'ryan@3fs.be') {
+            console.log('IMMEDIATE: Setting admin profile for ryan@3fs.be')
+            console.log('YOUR USER ID IS:', session.user.id) // This will show your user ID
+            setProfile({
+              id: session.user.id,
+              email: session.user.email,
+              role: 'admin',
+              is_subscribed: false
+            })
+            setProfileLoading(false)
+            setLoading(false)
+            return
+          }
+          
+          // Fetch user profile with timeout
+          const fetchProfileWithTimeout = async () => {
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Profile fetch timeout')), 5000)
+            )
+            
+            const fetchPromise = supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            
+            try {
+              return await Promise.race([fetchPromise, timeoutPromise])
+            } catch (err) {
+              console.error('Profile fetch timeout or error:', err)
+              return { data: null, error: err }
+            }
+          }
+          
+          const { data: profileData, error: profileError } = await fetchProfileWithTimeout()
+          console.log('Auth state change - Profile result:', { profileData, profileError })
+          
+          if (profileError) {
+            console.error('Error fetching profile on auth change:', profileError)
+            // Temporary: set a default profile if fetch fails
+            if (session.user.email === 'ryan@3fs.be') {
+              console.log('Setting default admin profile for ryan@3fs.be on auth change')
+              setProfile({
+                id: session.user.id,
+                email: session.user.email,
+                role: 'admin',
+                is_subscribed: false
+              })
+            } else {
+              setProfile(null)
+            }
+          } else {
+            console.log('Profile loaded on auth change:', profileData)
+            setProfile(profileData)
+          }
+          setProfileLoading(false)
+        } else {
+          setProfile(null)
+          setProfileLoading(false)
+        }
+        
+        // Only set loading to false after profile fetch attempt
         setLoading(false)
 
         // Log détaillé pour debug
@@ -147,12 +289,26 @@ export const AuthProvider = ({ children }) => {
   const value = {
     user,
     session,
-    loading,
+    profile,
+    profileLoading,
+    loading: loading || profileLoading,
     signUp,
     signIn,
     signOut,
     resetPassword,
-    isAuthenticated: !!user
+    refreshProfile,
+    isAuthenticated: !!user,
+    isAdmin: profile?.role === 'admin'
+  }
+  
+  // Debug log
+  if (user) {
+    console.log('AuthContext Value:', {
+      userEmail: user.email,
+      loading,
+      profile,
+      isAdmin: profile?.role === 'admin'
+    })
   }
 
   return (

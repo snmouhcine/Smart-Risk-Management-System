@@ -11,12 +11,14 @@ import {
   Save,
   Eye,
   EyeOff,
-  Globe
+  Globe,
+  CreditCard
 } from 'lucide-react';
 import { AI_MODELS, testAPIConnection } from '../../utils/aiProviders';
 import { parseNumberInput, formatCurrency } from '../../utils/formatters';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import SubscriptionManager from '../SubscriptionManager';
 
 const SettingsModule = ({
   initialCapital,
@@ -144,7 +146,8 @@ const SettingsModule = ({
     { id: 'capital', label: 'Capital & Performance', icon: DollarSign },
     { id: 'management', label: 'Money Management IA', icon: Brain },
     { id: 'ai', label: 'Modèles IA', icon: Brain },
-    { id: 'profile', label: 'Profil & Mot de passe', icon: User }
+    { id: 'profile', label: 'Profil & Mot de passe', icon: User },
+    { id: 'subscription', label: 'Abonnement', icon: CreditCard }
   ];
 
   return (
@@ -569,6 +572,13 @@ const SettingsModule = ({
                   <li>• Activez l'authentification à deux facteurs si disponible</li>
                 </ul>
               </div>
+            </div>
+          )}
+
+          {/* Subscription Tab */}
+          {activeTab === 'subscription' && (
+            <div>
+              <SubscriptionManager />
             </div>
           )}
         </div>

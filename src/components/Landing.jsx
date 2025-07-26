@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 import {
   ChevronRight,
   Shield,
@@ -35,7 +36,9 @@ import {
 const Landing = () => {
   const navigate = useNavigate();
   const [isScrolled, setIsScrolled] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState('pro');
+  const [selectedPlan, setSelectedPlan] = useState(null);
+  const [subscriptionPlans, setSubscriptionPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
   const [animatedNumbers, setAnimatedNumbers] = useState({
     winRate: 0,
     users: 0,
@@ -51,6 +54,37 @@ const Landing = () => {
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Fetch subscription plans
+  useEffect(() => {
+    fetchSubscriptionPlans();
+  }, []);
+
+  const fetchSubscriptionPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('subscription_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price', { ascending: true });
+
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        setSubscriptionPlans(data);
+        // Set the middle plan as selected by default
+        if (data.length >= 2) {
+          setSelectedPlan(data[1].id);
+        } else {
+          setSelectedPlan(data[0].id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching subscription plans:', error);
+    } finally {
+      setPlansLoading(false);
+    }
+  };
 
   // Animated numbers effect
   useEffect(() => {
@@ -516,157 +550,71 @@ const Landing = () => {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {/* Starter Plan */}
-            <div className={`relative p-8 rounded-2xl border-2 transition-all duration-300 ${
-              selectedPlan === 'starter' 
-                ? 'border-purple-500 shadow-2xl scale-105' 
-                : 'border-slate-200 hover:border-purple-200'
-            }`}>
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Starter</h3>
-              <p className="text-slate-600 mb-6">Perfect for new traders</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">$29</span>
-                <span className="text-slate-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Trading Journal</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Basic Analytics</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Position Calculator</span>
-                </li>
-                <li className="flex items-center">
-                  <X className="w-5 h-5 text-slate-300 mr-3" />
-                  <span className="text-slate-400">AI Analysis</span>
-                </li>
-                <li className="flex items-center">
-                  <X className="w-5 h-5 text-slate-300 mr-3" />
-                  <span className="text-slate-400">Advanced Checklists</span>
-                </li>
-              </ul>
-              <button
-                onClick={() => {
-                  setSelectedPlan('starter');
-                  navigate('/auth');
-                }}
-                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
-                  selectedPlan === 'starter'
-                    ? 'bg-purple-600 text-white hover:bg-purple-700'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Start Free Trial
-              </button>
+          {plansLoading ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600" />
             </div>
-
-            {/* Pro Plan - Recommended */}
-            <div className={`relative p-8 rounded-2xl border-2 transition-all duration-300 ${
-              selectedPlan === 'pro' 
-                ? 'border-purple-500 shadow-2xl scale-105' 
-                : 'border-slate-200 hover:border-purple-200'
-            }`}>
-              {/* Popular badge */}
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
-                <span className="px-4 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-full">
-                  MOST POPULAR
-                </span>
-              </div>
-              
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Professional</h3>
-              <p className="text-slate-600 mb-6">For serious traders</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">$79</span>
-                <span className="text-slate-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Everything in Starter</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">AI-Powered Analysis</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Advanced Analytics</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Custom Checklists</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Priority Support</span>
-                </li>
-              </ul>
-              <button
-                onClick={() => {
-                  setSelectedPlan('pro');
-                  navigate('/auth');
-                }}
-                className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg font-semibold hover:shadow-lg transform hover:scale-105 transition-all duration-200"
-              >
-                Start Free Trial
-              </button>
+          ) : subscriptionPlans.length > 0 ? (
+            <div className={`grid grid-cols-1 md:grid-cols-${Math.min(subscriptionPlans.length, 3)} gap-8 max-w-6xl mx-auto`}>
+              {subscriptionPlans.map((plan, index) => {
+                const isMiddlePlan = subscriptionPlans.length >= 2 && index === Math.floor(subscriptionPlans.length / 2);
+                const isSelected = selectedPlan === plan.id;
+                
+                return (
+                  <div
+                    key={plan.id}
+                    className={`relative p-8 rounded-2xl border-2 transition-all duration-300 ${
+                      isSelected
+                        ? 'border-purple-500 shadow-2xl scale-105'
+                        : 'border-slate-200 hover:border-purple-200'
+                    }`}
+                  >
+                    {/* Popular badge for middle plan */}
+                    {isMiddlePlan && (
+                      <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                        <span className="px-4 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-full">
+                          MOST POPULAR
+                        </span>
+                      </div>
+                    )}
+                    
+                    <h3 className="text-2xl font-bold text-slate-900 mb-6">{plan.name}</h3>
+                    <div className="mb-6">
+                      <span className="text-4xl font-bold text-slate-900">€{plan.price}</span>
+                      <span className="text-slate-600">/mois</span>
+                    </div>
+                    
+                    <ul className="space-y-3 mb-8">
+                      {plan.features?.features?.map((feature, featureIndex) => (
+                        <li key={featureIndex} className="flex items-center">
+                          <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
+                          <span className="text-slate-700">{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    
+                    <button
+                      onClick={() => {
+                        setSelectedPlan(plan.id);
+                        navigate('/auth');
+                      }}
+                      className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
+                        isSelected || isMiddlePlan
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:shadow-lg transform hover:scale-105'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      Commencer l'essai gratuit
+                    </button>
+                  </div>
+                );
+              })}
             </div>
-
-            {/* Elite Plan */}
-            <div className={`relative p-8 rounded-2xl border-2 transition-all duration-300 ${
-              selectedPlan === 'elite' 
-                ? 'border-purple-500 shadow-2xl scale-105' 
-                : 'border-slate-200 hover:border-purple-200'
-            }`}>
-              <h3 className="text-2xl font-bold text-slate-900 mb-2">Elite</h3>
-              <p className="text-slate-600 mb-6">For professional firms</p>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-slate-900">$199</span>
-                <span className="text-slate-600">/month</span>
-              </div>
-              <ul className="space-y-3 mb-8">
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Everything in Pro</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Team Collaboration</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">API Access</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Custom Integrations</span>
-                </li>
-                <li className="flex items-center">
-                  <Check className="w-5 h-5 text-green-500 mr-3" />
-                  <span className="text-slate-700">Dedicated Manager</span>
-                </li>
-              </ul>
-              <button
-                onClick={() => {
-                  setSelectedPlan('elite');
-                  navigate('/auth');
-                }}
-                className={`w-full py-3 rounded-lg font-semibold transition-all duration-200 ${
-                  selectedPlan === 'elite'
-                    ? 'bg-purple-600 text-white hover:bg-purple-700'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                Contact Sales
-              </button>
+          ) : (
+            <div className="text-center py-20">
+              <p className="text-slate-600">Aucun plan d'abonnement disponible pour le moment.</p>
             </div>
-          </div>
+          )}
 
           {/* Money-back guarantee */}
           <div className="text-center mt-12">
