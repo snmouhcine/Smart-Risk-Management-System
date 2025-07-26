@@ -18,7 +18,6 @@ import { AI_MODELS, testAPIConnection } from '../../utils/aiProviders';
 import { parseNumberInput, formatCurrency } from '../../utils/formatters';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import SubscriptionManager from '../SubscriptionManager';
 
 const SettingsModule = ({
   initialCapital,
@@ -577,8 +576,25 @@ const SettingsModule = ({
 
           {/* Subscription Tab */}
           {activeTab === 'subscription' && (
-            <div>
-              <SubscriptionManager />
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-lg p-6 text-white">
+                <h3 className="text-lg font-semibold mb-2">Gestion de l'abonnement</h3>
+                <p className="text-sm opacity-90 mb-4">
+                  Gérez votre abonnement directement depuis le portail Stripe.
+                </p>
+                <button
+                  onClick={() => window.open('https://billing.stripe.com/p/login/test_YOUR_LINK', '_blank')}
+                  className="bg-white text-purple-600 px-4 py-2 rounded-lg font-medium hover:bg-gray-100 transition-colors flex items-center gap-2"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Gérer mon abonnement
+                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                <p>• Modifiez votre méthode de paiement</p>
+                <p>• Consultez votre historique de facturation</p>
+                <p>• Annulez ou réactivez votre abonnement</p>
+              </div>
             </div>
           )}
         </div>

@@ -6,16 +6,14 @@ import AdminGuard from './components/admin/AdminGuard'
 import MethodeAlpha from './components/MethodeAlpha'
 import Landing from './components/Landing'
 import Auth from './components/auth/Auth'
-import AdminDashboard from './components/admin/AdminDashboard'
-import UserManagement from './components/admin/UserManagement'
+import AdminDashboardFixed from './components/admin/AdminDashboardFixed'
+import UserManagementFixed from './components/admin/UserManagementFixed'
 import AdminAnalytics from './components/admin/AdminAnalytics'
 import AdminPayments from './components/admin/AdminPayments'
 import AdminSubscriptions from './components/admin/AdminSubscriptions'
 import AdminSettings from './components/admin/AdminSettings'
 import PaymentSuccessAutomatic from './components/PaymentSuccessAutomatic'
 import PaymentCancelled from './components/PaymentCancelled'
-import StripeTest from './components/StripeTest'
-import ForceRefresh from './components/ForceRefresh'
 
 function App() {
   return (
@@ -43,7 +41,7 @@ function App() {
             path="/admin" 
             element={
               <AdminGuard>
-                <AdminDashboard />
+                <AdminDashboardFixed />
               </AdminGuard>
             } 
           />
@@ -51,7 +49,7 @@ function App() {
             path="/admin/users" 
             element={
               <AdminGuard>
-                <UserManagement />
+                <UserManagementFixed />
               </AdminGuard>
             } 
           />
@@ -91,8 +89,6 @@ function App() {
           {/* Payment routes */}
           <Route path="/payment-success" element={<PaymentSuccessAutomatic />} />
           <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-          <Route path="/stripe-test" element={<StripeTest />} />
-          <Route path="/force-refresh" element={<ForceRefresh />} />
           
           {/* Redirect any unknown routes to landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
