@@ -54,6 +54,35 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
+  // Periodic profile refresh to prevent subscription status loss
+  useEffect(() => {
+    if (!user || !profile) return
+    
+    // Refresh profile every 5 minutes to ensure subscription status is current
+    const intervalId = setInterval(async () => {
+      console.log('⏰ Periodic profile refresh...')
+      try {
+        const { data: currentProfile, error } = await supabase
+          .from('user_profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single()
+        
+        if (!error && currentProfile) {
+          // Only update if subscription status changed
+          if (currentProfile.is_subscribed !== profile.is_subscribed) {
+            console.log('📊 Subscription status changed:', profile.is_subscribed, '→', currentProfile.is_subscribed)
+            setProfile(currentProfile)
+          }
+        }
+      } catch (err) {
+        console.error('Error in periodic refresh:', err)
+      }
+    }, 5 * 60 * 1000) // 5 minutes
+    
+    return () => clearInterval(intervalId)
+  }, [user, profile])
+  
   useEffect(() => {
     // Récupérer la session initiale
     const getInitialSession = async () => {
@@ -194,7 +223,23 @@ export const AuthProvider = ({ children }) => {
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 Déconnexion')
         } else if (event === 'TOKEN_REFRESHED') {
-          console.log('🔄 Token rafraîchi')
+          console.log('🔄 Token rafraîchi - Recharging profile...')
+          
+          // IMPORTANT: Re-fetch profile when token is refreshed
+          if (session?.user) {
+            const { data: refreshedProfile, error: refreshError } = await supabase
+              .from('user_profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
+            
+            if (!refreshError && refreshedProfile) {
+              console.log('✅ Profile refreshed after token refresh:', refreshedProfile)
+              setProfile(refreshedProfile)
+            } else {
+              console.error('❌ Error refreshing profile after token refresh:', refreshError)
+            }
+          }
         }
       }
     )
