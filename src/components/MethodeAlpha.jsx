@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Calculator, TrendingUp, AlertTriangle, DollarSign, Target, 
   TrendingDown, Calendar, Brain, Shield, BarChart3, PieChart,
@@ -20,6 +21,7 @@ import AdvancedAnalytics from './modules/AdvancedAnalytics';
 
 const MethodeAlpha = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const { 
     loading: dataLoading, 
     userSettings, 
@@ -1190,7 +1192,12 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
             </div>
             
             <button
-              onClick={signOut}
+              onClick={() => {
+                // Navigate first to avoid auth guard redirect
+                navigate('/');
+                // Then sign out
+                signOut();
+              }}
               className="flex items-center space-x-2 px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg transition-colors text-sm"
             >
               <LogOut className="w-4 h-4" />

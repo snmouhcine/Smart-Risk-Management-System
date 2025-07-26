@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Eye, EyeOff, UserPlus, Mail, Lock, User, AlertCircle, CheckCircle, Loader2 } from 'lucide-react'
 
 const Register = ({ onToggleMode }) => {
   const { signUp, loading } = useAuth()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',

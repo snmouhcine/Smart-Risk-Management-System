@@ -1,12 +1,10 @@
-import React, { useState } from 'react'
+import React from 'react'
+import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
-import Login from './Login'
-import Register from './Register'
 
 const AuthGuard = ({ children }) => {
   const { user, loading } = useAuth()
-  const [authMode, setAuthMode] = useState('login') // 'login' ou 'register'
 
   // Affichage de chargement pendant la vérification d'authentification
   if (loading) {
@@ -21,17 +19,9 @@ const AuthGuard = ({ children }) => {
     )
   }
 
-  // Si l'utilisateur n'est pas connecté, afficher les formulaires d'auth
+  // Si l'utilisateur n'est pas connecté, rediriger vers la page d'auth
   if (!user) {
-    return (
-      <>
-        {authMode === 'login' ? (
-          <Login onToggleMode={() => setAuthMode('register')} />
-        ) : (
-          <Register onToggleMode={() => setAuthMode('login')} />
-        )}
-      </>
-    )
+    return <Navigate to="/auth" replace />
   }
 
   // Si l'utilisateur est connecté, afficher l'application

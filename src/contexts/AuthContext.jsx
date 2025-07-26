@@ -119,6 +119,7 @@ export const AuthProvider = ({ children }) => {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       console.log('✅ Déconnexion réussie')
+      // Navigation will be handled by the component calling signOut
     } catch (error) {
       console.error('❌ Erreur déconnexion:', error)
     } finally {

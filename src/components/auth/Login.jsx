@@ -1,9 +1,11 @@
 import React, { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
 
 const Login = ({ onToggleMode }) => {
   const { signIn, loading } = useAuth()
+  const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -47,6 +49,9 @@ const Login = ({ onToggleMode }) => {
         } else {
           setError(error.message)
         }
+      } else {
+        // Connexion réussie - rediriger vers l'app
+        navigate('/app')
       }
     } catch (err) {
       setError('Une erreur inattendue s\'est produite')
