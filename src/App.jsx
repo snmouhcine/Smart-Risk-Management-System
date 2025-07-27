@@ -1,6 +1,8 @@
 import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { AuthProvider } from './contexts/AuthContext'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { SettingsProvider, useSettings } from './contexts/SettingsContext'
+import { supabase } from './lib/supabase'
 import AuthGuard from './components/auth/AuthGuard'
 import AdminGuard from './components/admin/AdminGuard'
 import MethodeAlpha from './components/MethodeAlpha'
@@ -14,12 +16,69 @@ import AdminSubscriptions from './components/admin/AdminSubscriptions'
 import AdminSettings from './components/admin/AdminSettings'
 import PaymentSuccessAutomatic from './components/PaymentSuccessAutomatic'
 import PaymentCancelled from './components/PaymentCancelled'
+import MaintenanceMode from './components/MaintenanceMode'
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
+        <SettingsProvider>
+          <AppContent />
+        </SettingsProvider>
+      </AuthProvider>
+    </Router>
+  )
+}
+
+function AppContent() {
+  const { settings, loading } = useSettings()
+  const { user } = useAuth()
+  const [isAdmin, setIsAdmin] = React.useState(false)
+  const [profileLoading, setProfileLoading] = React.useState(true)
+  
+  React.useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!user?.id) {
+        setIsAdmin(false)
+        setProfileLoading(false)
+        return
+      }
+      
+      try {
+        const { data } = await supabase
+          .from('user_profiles')
+          .select('is_admin')
+          .eq('id', user.id)
+          .single()
+        
+        setIsAdmin(data?.is_admin || false)
+      } catch (error) {
+        console.error('Error checking admin status:', error)
+        setIsAdmin(false)
+      } finally {
+        setProfileLoading(false)
+      }
+    }
+    
+    checkAdminStatus()
+  }, [user?.id])
+  
+  // Show loading while settings are being fetched
+  if (loading || profileLoading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+      </div>
+    )
+  }
+  
+  // Check maintenance mode (admins can bypass)
+  if (settings.maintenance_mode && !isAdmin) {
+    return <MaintenanceMode siteName={settings.site_name} />
+  }
+  
+  return (
+    <Routes>
           {/* Landing page - accessible to everyone */}
           <Route path="/" element={<Landing />} />
           
@@ -93,8 +152,6 @@ function App() {
           {/* Redirect any unknown routes to landing */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </AuthProvider>
-    </Router>
   )
 }
 

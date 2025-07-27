@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useSettings } from '../contexts/SettingsContext';
 import {
   ChevronRight,
   Shield,
@@ -35,6 +36,7 @@ import {
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { settings } = useSettings();
   const [isScrolled, setIsScrolled] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [subscriptionPlans, setSubscriptionPlans] = useState([]);
@@ -130,7 +132,7 @@ const Landing = () => {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <span className="text-xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Smart Risk Manager
+                {settings.site_name || 'Smart Risk Manager'}
               </span>
             </div>
             

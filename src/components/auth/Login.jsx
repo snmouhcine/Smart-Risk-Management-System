@@ -1,10 +1,12 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useSettings } from '../../contexts/SettingsContext'
 import { Eye, EyeOff, LogIn, Mail, Lock, AlertCircle, Loader2 } from 'lucide-react'
 
 const Login = ({ onToggleMode }) => {
   const { signIn, loading } = useAuth()
+  const { settings } = useSettings()
   const navigate = useNavigate()
   const [formData, setFormData] = useState({
     email: '',
@@ -162,13 +164,15 @@ const Login = ({ onToggleMode }) => {
 
           {/* Liens */}
           <div className="mt-6 text-center space-y-2">
-            <button
-              type="button"
-              onClick={onToggleMode}
-              className="text-blue-300 hover:text-white text-sm transition-colors"
-            >
-              Pas encore de compte ? <span className="font-medium">Créer un compte</span>
-            </button>
+            {settings.allow_registrations && (
+              <button
+                type="button"
+                onClick={onToggleMode}
+                className="text-blue-300 hover:text-white text-sm transition-colors"
+              >
+                Pas encore de compte ? <span className="font-medium">Créer un compte</span>
+              </button>
+            )}
           </div>
         </div>
 

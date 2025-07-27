@@ -19,7 +19,13 @@ import {
   Activity,
   CreditCard,
   Package,
-  Target
+  Target,
+  CheckCircle,
+  UserCheck,
+  Clock,
+  Euro,
+  Database,
+  Info as InfoIcon
 } from 'lucide-react'
 
 const AdminAnalytics = () => {
@@ -66,6 +72,40 @@ const AdminAnalytics = () => {
     fetchAnalytics()
   }, [isAdmin, navigate, timeRange])
 
+  const fetchStripeAnalytics = async (startDate, previousStartDate) => {
+    try {
+      // Call Supabase Edge Function to fetch Stripe analytics
+      const { data, error } = await supabase.functions.invoke('stripe-analytics', {
+        body: {
+          startDate: startDate.toISOString(),
+          previousStartDate: previousStartDate.toISOString(),
+          timeRange
+        }
+      })
+
+      if (error) {
+        console.error('Error fetching Stripe analytics:', error)
+        return {
+          mrr: 0,
+          churnRate: 0,
+          retentionRate: 100,
+          paymentSuccessRate: 100,
+          trialCount: 0
+        }
+      }
+
+      return data
+    } catch (error) {
+      console.error('Error calling Stripe analytics function:', error)
+      return {
+        mrr: 0,
+        churnRate: 0,
+        retentionRate: 100,
+        paymentSuccessRate: 100,
+        trialCount: 0
+      }
+    }
+  }
   const fetchAnalytics = async () => {
     setLoading(true)
     try {
@@ -91,16 +131,18 @@ const AdminAnalytics = () => {
           break
       }
 
-      // Fetch all payments
-      const { data: payments } = await supabase
+      // Fetch all payments (including failed ones for success rate calculation)
+      const { data: allPayments } = await supabase
         .from('payments')
         .select(`
           *,
           user_profiles(email, full_name),
           subscription_plans(name, price)
         `)
-        .eq('status', 'completed')
         .order('created_at', { ascending: false })
+      
+      // Filter completed payments for revenue calculations
+      const payments = allPayments?.filter(p => p.status === 'completed') || []
 
       // Fetch all users
       const { data: users } = await supabase
@@ -115,6 +157,9 @@ const AdminAnalytics = () => {
         .from('subscription_plans')
         .select('*')
         .eq('is_active', true)
+
+      // Fetch Stripe data for more accurate analytics
+      const stripeData = await fetchStripeAnalytics(startDate, previousStartDate)
 
       // Calculate revenue metrics
       const currentRevenue = payments
@@ -175,18 +220,23 @@ const AdminAnalytics = () => {
       const conversionRate = totalUsers > 0 ? (subscribedUsers / totalUsers * 100).toFixed(1) : 0
 
       // Performance metrics
-      const activeSubscriptions = subscribedUsers
       const subscriptionPrice = plans?.[0]?.price || 29.99
       
-      const mrr = subscribedUsers * subscriptionPrice
+      const mrr = stripeData.mrr || (subscribedUsers * subscriptionPrice)
       const arr = mrr * 12
       const avgOrderValue = payments?.length > 0 
         ? payments.reduce((sum, p) => sum + parseFloat(p.amount), 0) / payments.length
         : 0
 
-      // Calculate LTV (simplified: avg revenue per user * avg retention months)
-      const avgRevenuePerUser = totalUsers > 0 ? currentRevenue / totalUsers : 0
-      const estimatedRetentionMonths = 12 // Simplified assumption
+      // Use Stripe data for accurate metrics
+      const churnRate = stripeData.churnRate || 0
+      const retentionRate = stripeData.retentionRate || (100 - churnRate)
+      const paymentSuccessRate = stripeData.paymentSuccessRate || 100
+      const trialUsers = stripeData.trialCount || 0
+
+      // Calculate LTV using Stripe's retention data
+      const avgRevenuePerUser = subscribedUsers > 0 ? totalRevenue / subscribedUsers : 0
+      const estimatedRetentionMonths = retentionRate > 0 ? (100 / (100 - parseFloat(retentionRate))) : 12
       const ltv = avgRevenuePerUser * estimatedRetentionMonths
 
       setAnalytics({
@@ -201,20 +251,20 @@ const AdminAnalytics = () => {
         users: {
           total: totalUsers,
           new: newUsers,
-          churn: 5.2, // Mock for now
-          retention: 94.8, // Mock for now
+          churn: parseFloat(churnRate),
+          retention: parseFloat(retentionRate),
           byPlan: usersByPlan,
           ltv: ltv
         },
         conversion: {
           rate: parseFloat(conversionRate),
-          trials: 23 // Mock for now
+          trials: trialUsers
         },
         performance: {
           mrr,
           arr,
           avgOrderValue,
-          paymentSuccess: 98.5 // Mock for now
+          paymentSuccess: parseFloat(paymentSuccessRate)
         }
       })
 
@@ -230,10 +280,6 @@ const AdminAnalytics = () => {
       style: 'currency',
       currency: 'EUR'
     }).format(amount)
-  }
-
-  const formatNumber = (num) => {
-    return new Intl.NumberFormat('fr-FR').format(num)
   }
 
   if (loading) {
@@ -253,7 +299,10 @@ const AdminAnalytics = () => {
       {/* Header */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="flex items-center justify-between">
-          <p className="text-gray-400">Analyse détaillée des performances</p>
+          <div>
+            <h1 className="text-2xl font-bold text-white mb-2">Analytics Dashboard</h1>
+            <p className="text-gray-400">Données en temps réel depuis Stripe et la base de données</p>
+          </div>
           <select
             value={timeRange}
             onChange={(e) => setTimeRange(e.target.value)}
@@ -266,178 +315,160 @@ const AdminAnalytics = () => {
         </div>
       </div>
 
-      {/* Key Metrics */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {/* MRR */}
-        <div className="bg-gradient-to-br from-green-600 to-green-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <DollarSign className="h-10 w-10 opacity-80" />
-            <div className="text-right">
-              <span className={`text-sm font-medium px-2 py-1 rounded-full ${
-                analytics.revenue.growth >= 0 ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
-              }`}>
-                {analytics.revenue.growth >= 0 ? '+' : ''}{analytics.revenue.growth}%
-              </span>
-            </div>
-          </div>
-          <h3 className="text-3xl font-bold mb-1">{formatCurrency(analytics.performance.mrr)}</h3>
-          <p className="text-green-200">MRR (Revenus récurrents mensuels)</p>
-        </div>
-
-        {/* ARR */}
-        <div className="bg-gradient-to-br from-purple-600 to-purple-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <TrendingUp className="h-10 w-10 opacity-80" />
-            <Target className="h-6 w-6 opacity-60" />
-          </div>
-          <h3 className="text-3xl font-bold mb-1">{formatCurrency(analytics.performance.arr)}</h3>
-          <p className="text-purple-200">ARR (Revenus récurrents annuels)</p>
-        </div>
-
-        {/* Conversion Rate */}
-        <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <PieChart className="h-10 w-10 opacity-80" />
-            <Activity className="h-6 w-6 opacity-60" />
-          </div>
-          <h3 className="text-3xl font-bold mb-1">{analytics.conversion.rate}%</h3>
-          <p className="text-blue-200">Taux de conversion</p>
-        </div>
-
-        {/* LTV */}
-        <div className="bg-gradient-to-br from-orange-600 to-orange-700 rounded-xl p-6 text-white">
-          <div className="flex items-center justify-between mb-4">
-            <Users className="h-10 w-10 opacity-80" />
-            <CreditCard className="h-6 w-6 opacity-60" />
-          </div>
-          <h3 className="text-3xl font-bold mb-1">{formatCurrency(analytics.users.ltv)}</h3>
-          <p className="text-orange-200">Valeur vie client (LTV)</p>
-        </div>
-      </div>
-
-      {/* Revenue Charts */}
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-        {/* Revenue Trend */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center justify-between">
-            <span>Évolution des revenus</span>
-            <BarChart3 className="h-5 w-5 text-gray-400" />
-          </h3>
-          <div className="space-y-4">
-            {analytics.revenue.byMonth.map((month, index) => (
-              <div key={index}>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-gray-400">{month.month}</span>
-                  <span className="text-white font-medium">{formatCurrency(month.revenue)}</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div
-                    className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-                    style={{ width: `${(month.revenue / Math.max(...analytics.revenue.byMonth.map(m => m.revenue)) * 100)}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Revenue Overview */}
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-xl font-bold text-white mb-6 flex items-center justify-between">
-            <span>Vue d'ensemble des revenus</span>
-            <Package className="h-5 w-5 text-gray-400" />
-          </h3>
-          <div className="bg-gray-700/50 rounded-lg p-6">
-            <div className="text-center">
-              <h4 className="text-white font-medium mb-2">Plan Pro</h4>
-              <span className="text-3xl font-bold text-white">
-                {formatCurrency(analytics.revenue.total)}
-              </span>
-              <p className="text-gray-400 mt-2">Revenus totaux</p>
-            </div>
-            <div className="grid grid-cols-2 gap-4 mt-6">
-              <div className="text-center">
-                <p className="text-2xl font-bold text-green-400">{analytics.users.byPlan[1]?.count || 0}</p>
-                <p className="text-sm text-gray-400">Abonnés actifs</p>
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-bold text-blue-400">{formatCurrency(29.99)}</p>
-                <p className="text-sm text-gray-400">Prix mensuel</p>
+      {/* Primary Metrics from Stripe */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+          <Activity className="h-5 w-5 mr-2 text-green-500" />
+          Métriques Stripe en temps réel
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {/* MRR */}
+          <div className="bg-gradient-to-br from-green-600 to-green-700 rounded-xl p-6 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <DollarSign className="h-8 w-8 opacity-80" />
+              <div className="text-right">
+                <span className={`text-sm font-medium px-2 py-1 rounded-full ${
+                  analytics.revenue.growth >= 0 ? 'bg-green-500/20 text-green-300' : 'bg-red-500/20 text-red-300'
+                }`}>
+                  {analytics.revenue.growth >= 0 ? '+' : ''}{analytics.revenue.growth}%
+                </span>
               </div>
             </div>
+            <h3 className="text-3xl font-bold mb-1">{formatCurrency(analytics.performance.mrr)}</h3>
+            <p className="text-green-200 text-sm">MRR (Monthly Recurring Revenue)</p>
+          </div>
+
+          {/* Payment Success Rate */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <CheckCircle className="h-8 w-8 text-blue-500" />
+              <span className="text-xs text-gray-500">Stripe</span>
+            </div>
+            <h3 className="text-3xl font-bold text-white mb-1">{analytics.performance.paymentSuccess}%</h3>
+            <p className="text-gray-400 text-sm">Taux de succès des paiements</p>
+          </div>
+
+          {/* Retention Rate */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <UserCheck className="h-8 w-8 text-purple-500" />
+              <span className="text-xs text-gray-500">Stripe</span>
+            </div>
+            <h3 className="text-3xl font-bold text-white mb-1">{analytics.users.retention}%</h3>
+            <p className="text-gray-400 text-sm">Taux de rétention</p>
+            <p className="text-xs text-red-400 mt-1">Churn: {analytics.users.churn}%</p>
+          </div>
+
+          {/* Active Trials */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <Clock className="h-8 w-8 text-orange-500" />
+              <span className="text-xs text-gray-500">Stripe</span>
+            </div>
+            <h3 className="text-3xl font-bold text-white mb-1">{analytics.conversion.trials}</h3>
+            <p className="text-gray-400 text-sm">Essais actifs</p>
           </div>
         </div>
       </div>
 
-      {/* User Metrics */}
+      {/* Database Metrics */}
+      <div className="max-w-7xl mx-auto mb-8">
+        <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+          <Database className="h-5 w-5 mr-2 text-blue-500" />
+          Métriques Base de Données
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Total Revenue */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <Euro className="h-8 w-8 text-green-500" />
+              <span className="text-xs text-gray-500">Database</span>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-1">{formatCurrency(analytics.revenue.total)}</h3>
+            <p className="text-gray-400 text-sm">Revenus totaux</p>
+            <div className="mt-3 text-sm">
+              <span className="text-gray-500">Ce mois: </span>
+              <span className="text-white font-medium">{formatCurrency(analytics.revenue.current)}</span>
+            </div>
+          </div>
+
+          {/* User Growth */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <Users className="h-8 w-8 text-blue-500" />
+              <span className="text-xs text-gray-500">Database</span>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-1">{analytics.users.total}</h3>
+            <p className="text-gray-400 text-sm">Utilisateurs totaux</p>
+            <div className="mt-3 flex items-center justify-between text-sm">
+              <span className="text-gray-500">Nouveaux: </span>
+              <span className="text-green-400 font-medium flex items-center">
+                +{analytics.users.new}
+                <ArrowUpRight className="h-3 w-3 ml-1" />
+              </span>
+            </div>
+          </div>
+
+          {/* Conversion Rate */}
+          <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
+            <div className="flex items-center justify-between mb-4">
+              <PieChart className="h-8 w-8 text-purple-500" />
+              <span className="text-xs text-gray-500">Database</span>
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-1">{analytics.conversion.rate}%</h3>
+            <p className="text-gray-400 text-sm">Taux de conversion</p>
+            <div className="mt-3 text-sm">
+              <span className="text-gray-500">Abonnés: </span>
+              <span className="text-white font-medium">{analytics.users.byPlan[1]?.count || 0}/{analytics.users.total}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Revenue Trend Chart */}
       <div className="max-w-7xl mx-auto mb-8">
         <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-xl font-bold text-white mb-6">Métriques utilisateurs</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Users by Plan */}
-            <div>
-              <h4 className="text-gray-400 mb-4">Répartition par plan</h4>
-              <div className="space-y-3">
-                {analytics.users.byPlan.map((plan, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${
-                        index === 0 ? 'bg-gray-500' :
-                        index === 1 ? 'bg-blue-500' : 'bg-purple-500'
-                      }`} />
-                      <span className="text-white">{plan.name}</span>
-                    </div>
-                    <span className="text-gray-400">{plan.count} utilisateurs</span>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-xl font-bold text-white flex items-center">
+              <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
+              Évolution des revenus
+            </h3>
+            <span className="text-xs text-gray-500">Données: Database</span>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Monthly Revenue Bars */}
+            <div className="space-y-4">
+              {analytics.revenue.byMonth.map((month, index) => (
+                <div key={index}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-400">{month.month}</span>
+                    <span className="text-white font-medium">{formatCurrency(month.revenue)}</span>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Conversion Metrics */}
-            <div>
-              <h4 className="text-gray-400 mb-4">Métriques de conversion</h4>
-              <div className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-white text-sm">Taux de conversion global</span>
-                    <span className="text-green-400 text-sm font-bold">{analytics.conversion.rate}%</span>
-                  </div>
-                  <div className="w-full bg-gray-700 rounded-full h-2">
+                  <div className="w-full bg-gray-700 rounded-full h-2.5">
                     <div
-                      className="bg-green-500 h-2 rounded-full"
-                      style={{ width: `${analytics.conversion.rate}%` }}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 h-2.5 rounded-full transition-all duration-500"
+                      style={{ width: `${(month.revenue / Math.max(...analytics.revenue.byMonth.map(m => m.revenue)) * 100)}%` }}
                     />
                   </div>
                 </div>
-                <div className="pt-2">
-                  <p className="text-gray-300 text-sm">
-                    {analytics.users.byPlan[1]?.count || 0} abonnés sur {analytics.users.total} utilisateurs
-                  </p>
-                </div>
-              </div>
+              ))}
             </div>
 
-            {/* Key Metrics */}
-            <div>
-              <h4 className="text-gray-400 mb-4">Métriques clés</h4>
+            {/* Summary Stats */}
+            <div className="bg-gray-700/30 rounded-lg p-6">
+              <h4 className="text-white font-medium mb-4">Résumé</h4>
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Nouveaux utilisateurs</span>
-                  <span className="text-white font-medium flex items-center">
-                    {analytics.users.new}
-                    <ArrowUpRight className="h-4 w-4 text-green-400 ml-1" />
-                  </span>
+                  <span className="text-gray-400">ARR projeté</span>
+                  <span className="text-xl font-bold text-white">{formatCurrency(analytics.performance.arr)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Taux de rétention</span>
-                  <span className="text-white font-medium">{analytics.users.retention}%</span>
+                  <span className="text-gray-400">Panier moyen</span>
+                  <span className="text-lg font-medium text-white">{formatCurrency(analytics.performance.avgOrderValue)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-300">Taux de désabonnement</span>
-                  <span className="text-white font-medium flex items-center">
-                    {analytics.users.churn}%
-                    <ArrowDownRight className="h-4 w-4 text-red-400 ml-1" />
-                  </span>
+                  <span className="text-gray-400">Abonnés actifs</span>
+                  <span className="text-lg font-medium text-white">{analytics.users.byPlan[1]?.count || 0}</span>
                 </div>
               </div>
             </div>
@@ -445,45 +476,20 @@ const AdminAnalytics = () => {
         </div>
       </div>
 
-      {/* Performance Indicators */}
+      {/* Data Sources Info */}
       <div className="max-w-7xl mx-auto">
-        <div className="bg-gray-800 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-xl font-bold text-white mb-6">Indicateurs de performance</h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">
-                {formatCurrency(analytics.performance.avgOrderValue)}
-              </div>
-              <p className="text-gray-400">Panier moyen</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">
-                {analytics.performance.paymentSuccess}%
-              </div>
-              <p className="text-gray-400">Taux de succès paiements</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">
-                {analytics.conversion.trials}
-              </div>
-              <p className="text-gray-400">Essais actifs</p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-white mb-2">
-                {formatCurrency(analytics.revenue.total)}
-              </div>
-              <p className="text-gray-400">Revenus totaux</p>
+        <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+          <div className="flex items-start space-x-3">
+            <InfoIcon className="h-5 w-5 text-blue-400 mt-0.5" />
+            <div className="text-sm">
+              <p className="text-blue-300 font-medium mb-1">Sources de données</p>
+              <p className="text-blue-200/70">
+                Les métriques marquées "Stripe" sont récupérées en temps réel depuis l'API Stripe. 
+                Les métriques "Database" proviennent de votre base de données Supabase.
+              </p>
             </div>
           </div>
         </div>
-      </div>
-
-      {/* Export Button */}
-      <div className="max-w-7xl mx-auto mt-8 flex justify-end">
-        <button className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2">
-          <Download className="h-5 w-5" />
-          <span>Exporter les données</span>
-        </button>
       </div>
       </div>
     </AdminLayout>

@@ -33,7 +33,8 @@ const AdminSubscriptions = () => {
     totalPlans: 0,
     activePlans: 0,
     totalSubscribers: 0,
-    monthlyRevenue: 0
+    monthlyRevenue: 0,
+    isStripeData: false
   })
 
   useEffect(() => {
@@ -60,10 +61,20 @@ const AdminSubscriptions = () => {
 
   const fetchStats = async () => {
     try {
-      // Get subscriber count
-      const { count: subscribers } = await supabase
+      // Get all subscription plans with their prices
+      const { data: allPlans } = await supabase
+        .from('subscription_plans')
+        .select('*')
+
+      // Get subscriber count with their subscription details
+      const { data: subscribers } = await supabase
         .from('user_profiles')
-        .select('*', { count: 'exact', head: true })
+        .select(`
+          id,
+          is_subscribed,
+          stripe_subscription_id,
+          subscription_plan_id
+        `)
         .eq('is_subscribed', true)
 
       // Get active plans count
@@ -72,14 +83,42 @@ const AdminSubscriptions = () => {
         .select('*', { count: 'exact', head: true })
         .eq('is_active', true)
 
-      // Calculate monthly revenue (simplified)
-      const monthlyRevenue = (subscribers || 0) * 29.99
+      // Calculate real MRR based on actual subscriptions
+      let monthlyRevenue = 0
+      let isStripeData = false
+      
+      // If we can get Stripe data, use it for accurate MRR
+      try {
+        const { data: stripeData } = await supabase.functions.invoke('stripe-analytics', {
+          body: {
+            startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            previousStartDate: new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString(),
+            timeRange: 'month'
+          }
+        })
+        
+        if (stripeData?.mrr) {
+          monthlyRevenue = stripeData.mrr
+          isStripeData = true
+        } else {
+          // Fallback: Calculate from database
+          // Get the default plan price (assuming most users are on the same plan)
+          const defaultPlan = allPlans?.find(p => p.is_active) || allPlans?.[0]
+          monthlyRevenue = (subscribers?.length || 0) * (defaultPlan?.price || 29.99)
+        }
+      } catch (error) {
+        // If Stripe fails, use database calculation
+        console.log('Using database calculation for MRR')
+        const defaultPlan = allPlans?.find(p => p.is_active) || allPlans?.[0]
+        monthlyRevenue = (subscribers?.length || 0) * (defaultPlan?.price || 29.99)
+      }
 
       setStats({
-        totalPlans: plans.length,
+        totalPlans: allPlans?.length || 0,
         activePlans: activePlans || 0,
-        totalSubscribers: subscribers || 0,
-        monthlyRevenue
+        totalSubscribers: subscribers?.length || 0,
+        monthlyRevenue,
+        isStripeData: false
       })
     } catch (error) {
       console.error('Error fetching stats:', error)
@@ -264,7 +303,9 @@ const AdminSubscriptions = () => {
               <TrendingUp className="h-8 w-8 text-green-400" />
             </div>
             <h3 className="text-2xl font-bold text-white">{formatCurrency(stats.monthlyRevenue)}</h3>
-            <p className="text-gray-400 text-sm">MRR estimé</p>
+            <p className="text-gray-400 text-sm">
+              MRR {stats.isStripeData ? '(Stripe)' : 'estimé'}
+            </p>
           </div>
         </div>
 

@@ -50,3 +50,7 @@ Thumbs.db
 
 # Cleanup backup directory
 .cleanup-backup/
+
+# Claude Code specific
+.claude/
+claude-code-subagents-collection/
