@@ -128,7 +128,7 @@ serve(async (req) => {
     return new Response('Method not allowed', { status: 405 })
 
   } catch (error) {
-    console.error('Error in site-settings function:', error)
+    // Error in site-settings function
     return new Response(
       JSON.stringify({ error: error.message }),
       {

@@ -53,7 +53,7 @@ const AdminSubscriptions = () => {
       if (error) throw error
       setPlans(data || [])
     } catch (error) {
-      console.error('Error fetching plans:', error)
+      // Error fetching plans
     } finally {
       setLoading(false)
     }
@@ -108,7 +108,7 @@ const AdminSubscriptions = () => {
         }
       } catch (error) {
         // If Stripe fails, use database calculation
-        console.log('Using database calculation for MRR')
+        // Using database calculation for MRR
         const defaultPlan = allPlans?.find(p => p.is_active) || allPlans?.[0]
         monthlyRevenue = (subscribers?.length || 0) * (defaultPlan?.price || 29.99)
       }
@@ -121,7 +121,7 @@ const AdminSubscriptions = () => {
         isStripeData: false
       })
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      // Error fetching stats
     }
   }
 
@@ -173,7 +173,7 @@ const AdminSubscriptions = () => {
       setShowAddPlan(false)
       setEditingPlan(null)
     } catch (error) {
-      console.error('Error saving plan:', error)
+      // Error saving plan
       if (error.code === '42P17') {
         alert('Erreur de permissions. Veuillez exécuter cette requête SQL dans votre dashboard Supabase:\n\n' +
           '-- Fix RLS policies\n' +
@@ -202,7 +202,7 @@ const AdminSubscriptions = () => {
       if (error) throw error
       fetchPlans()
     } catch (error) {
-      console.error('Error deleting plan:', error)
+      // Error deleting plan
       alert('Erreur lors de la suppression')
     }
   }
@@ -217,7 +217,7 @@ const AdminSubscriptions = () => {
       if (error) throw error
       fetchPlans()
     } catch (error) {
-      console.error('Error toggling plan status:', error)
+      // Error toggling plan status
     }
   }
 

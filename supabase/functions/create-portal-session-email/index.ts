@@ -32,14 +32,14 @@ serve(async (req) => {
     
     if (customers.data.length > 0) {
       customerId = customers.data[0].id
-      console.log('Found existing customer:', customerId)
+      // Found existing customer
     } else {
       // Create a new customer if none exists
       const customer = await stripe.customers.create({
         email: customerEmail,
       })
       customerId = customer.id
-      console.log('Created new customer:', customerId)
+      // Created new customer
     }
 
     // Create portal session
@@ -56,7 +56,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Portal session error:', error)
+    // Portal session error
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

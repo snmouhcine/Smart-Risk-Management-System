@@ -14,11 +14,11 @@ const PaymentSuccessAutomatic = () => {
     let mounted = true
     
     const activateSubscription = async () => {
-      console.log('Payment success page loaded, checking user...')
+      // Payment success page loaded, checking user...
       
       // First, try to get the session directly
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('Session check:', session?.user?.email)
+      // Session check
       
       // Wait for user to be loaded (up to 15 seconds)
       let attempts = 0
@@ -31,12 +31,12 @@ const PaymentSuccessAutomatic = () => {
         attempts++
         
         if (attempts % 6 === 0) {
-          console.log(`Still waiting for user... (${attempts/2}s)`)
+          // Still waiting for user...
         }
       }
 
       if (!currentUser || !mounted) {
-        console.error('No user found after 15 seconds')
+        // No user found after 15 seconds
         setError('Session de connexion non trouvée. Veuillez vous reconnecter.')
         setStatus('error')
         return
@@ -46,18 +46,18 @@ const PaymentSuccessAutomatic = () => {
       const activeUser = currentUser
 
       try {
-        console.log('Activating subscription for:', activeUser.email)
+        // Activating subscription
         
         // Skip Edge Function and go directly to database update
         // This is what the "Force activation" button does and it works
-        console.log('Using direct database update for immediate activation')
+        // Using direct database update for immediate activation
         
         // Try up to 3 times with a small delay
         let updateSuccess = false
         let lastError = null
         
         for (let attempt = 1; attempt <= 3 && !updateSuccess; attempt++) {
-          console.log(`Activation attempt ${attempt}/3`)
+          // Activation attempt
           
           // Method 1: Try updating by user ID (most reliable)
           const { data: updateData, error: updateError } = await supabase
@@ -68,12 +68,12 @@ const PaymentSuccessAutomatic = () => {
             .single()
           
           if (!updateError) {
-            console.log('Subscription activated successfully:', updateData)
+            // Subscription activated successfully
             updateSuccess = true
             break
           }
           
-          console.error(`Attempt ${attempt} failed:`, updateError)
+          // Attempt failed
           lastError = updateError
           
           // If not the last attempt, wait a bit before retrying
@@ -84,21 +84,21 @@ const PaymentSuccessAutomatic = () => {
         
         // If all attempts with ID failed, try with email
         if (!updateSuccess) {
-          console.log('All ID updates failed, trying email update...')
+          // All ID updates failed, trying email update...
           const { error: emailUpdateError } = await supabase
             .from('user_profiles')
             .update({ is_subscribed: true })
             .eq('email', activeUser.email)
           
           if (emailUpdateError) {
-            console.error('Email update also failed:', emailUpdateError)
+            // Email update also failed
             throw new Error('Unable to activate subscription after multiple attempts')
           } else {
             updateSuccess = true
           }
         }
         
-        console.log('Subscription activated successfully!')
+        // Subscription activated successfully!
         
         // Refresh the profile to get updated data
         if (refreshProfile) {
@@ -118,7 +118,7 @@ const PaymentSuccessAutomatic = () => {
         }
         
       } catch (err) {
-        console.error('Activation error:', err)
+        // Activation error
         if (mounted) {
           setError(err.message || 'Failed to activate subscription')
           setStatus('error')
@@ -185,7 +185,7 @@ const PaymentSuccessAutomatic = () => {
                   setTimeout(() => navigate('/app'), 1000)
                 }
               } catch (err) {
-                console.error('Force activation failed:', err)
+                // Force activation failed
                 navigate('/app')
               }
             }}

@@ -155,7 +155,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Error in stripe-analytics function:', error)
+    // Error in stripe-analytics function
     return new Response(
       JSON.stringify({ error: error.message }),
       {

@@ -174,7 +174,7 @@ serve(async (req) => {
       }
     )
   } catch (error) {
-    console.error('Error in stripe-payments function:', error)
+    // Error in stripe-payments function
     return new Response(
       JSON.stringify({ error: error.message }),
       {

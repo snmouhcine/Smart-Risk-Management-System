@@ -84,7 +84,7 @@ const AdminAnalytics = () => {
       })
 
       if (error) {
-        console.error('Error fetching Stripe analytics:', error)
+        // Error fetching Stripe analytics
         return {
           mrr: 0,
           churnRate: 0,
@@ -96,7 +96,7 @@ const AdminAnalytics = () => {
 
       return data
     } catch (error) {
-      console.error('Error calling Stripe analytics function:', error)
+      // Error calling Stripe analytics function
       return {
         mrr: 0,
         churnRate: 0,
@@ -269,7 +269,7 @@ const AdminAnalytics = () => {
       })
 
     } catch (error) {
-      console.error('Error fetching analytics:', error)
+      // Error fetching analytics
     } finally {
       setLoading(false)
     }

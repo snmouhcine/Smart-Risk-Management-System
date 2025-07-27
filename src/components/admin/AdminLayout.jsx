@@ -125,7 +125,6 @@ const AdminLayout = ({ children }) => {
         if (stripeData?.mrr) {
           monthlyRevenue = stripeData.mrr
           isStripeData = true
-          console.log('MRR from Stripe:', stripeData.mrr)
         } else {
           // Fallback: Get actual plan price from database
           const { data: activePlan } = await supabase
@@ -136,11 +135,10 @@ const AdminLayout = ({ children }) => {
           
           const planPrice = activePlan?.price || 40.99
           monthlyRevenue = (activeUsers || 0) * planPrice
-          console.log('MRR calculated:', monthlyRevenue, 'for', activeUsers, 'users at', planPrice, 'EUR each')
         }
       } catch (error) {
         // If Stripe fails, use simple calculation with your actual price
-        console.log('Stripe API error:', error)
+        // Stripe API error - fallback to calculation
         const { data: activePlan } = await supabase
           .from('subscription_plans')
           .select('price')
@@ -164,7 +162,7 @@ const AdminLayout = ({ children }) => {
         isStripeData
       })
     } catch (error) {
-      console.error('Error fetching quick stats:', error)
+      // Error fetching quick stats
       setQuickStats(prev => ({ ...prev, isLoading: false }))
     }
   }
@@ -180,11 +178,10 @@ const AdminLayout = ({ children }) => {
         .single()
       
       if (!error && data) {
-        console.log('User profile data:', data) // Debug log
         setUserProfile(data)
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error)
+      // Silent error - profile fetch failed
     }
   }
 

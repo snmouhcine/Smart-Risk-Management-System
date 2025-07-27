@@ -54,7 +54,7 @@ function AppContent() {
         
         setIsAdmin(data?.is_admin || false)
       } catch (error) {
-        console.error('Error checking admin status:', error)
+        // Error checking admin status
         setIsAdmin(false)
       } finally {
         setProfileLoading(false)

@@ -80,7 +80,7 @@ export const SettingsProvider = ({ children }) => {
         .limit(1)
       
       if (tableError && tableError.code === '42P01') {
-        console.log('Settings table does not exist yet. Using defaults.')
+        // Settings table does not exist yet. Using defaults.
         setLoading(false)
         return
       }
@@ -106,7 +106,7 @@ export const SettingsProvider = ({ children }) => {
           return
         }
       } catch (funcError) {
-        console.log('Edge Function not available, falling back to direct database query')
+        // Edge Function not available, falling back to direct database query
       }
       
       // Fallback: Try direct database query
@@ -126,7 +126,7 @@ export const SettingsProvider = ({ children }) => {
         setSettings(prev => ({ ...prev, ...settingsObject }))
       }
     } catch (error) {
-      console.error('Error in loadSettings:', error)
+      // Error in loadSettings
     } finally {
       setLoading(false)
     }
@@ -160,7 +160,7 @@ export const SettingsProvider = ({ children }) => {
           return { success: true }
         }
       } catch (funcError) {
-        console.log('Edge Function not available, using direct database update')
+        // Edge Function not available, using direct database update
       }
 
       // Fallback: Use RPC functions which have SECURITY DEFINER
@@ -202,7 +202,7 @@ export const SettingsProvider = ({ children }) => {
       
       return { success: true }
     } catch (error) {
-      console.error('Error updating settings:', error)
+      // Error updating settings
       return { success: false, error: error.message }
     }
   }

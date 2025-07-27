@@ -18,7 +18,6 @@ export class DataService {
       
       return data || this.getDefaultSettings(userId)
     } catch (error) {
-      console.error('Erreur récupération paramètres:', error)
       return this.getDefaultSettings(userId)
     }
   }
@@ -40,10 +39,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Paramètres sauvegardés:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde paramètres:', error)
       throw error
     }
   }
@@ -91,7 +88,6 @@ export class DataService {
       
       return journalObject
     } catch (error) {
-      console.error('Erreur récupération journal:', error)
       return {}
     }
   }
@@ -116,10 +112,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Entrée journal sauvegardée:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde journal:', error)
       throw error
     }
   }
@@ -135,9 +129,7 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Entrée journal supprimée:', date)
     } catch (error) {
-      console.error('❌ Erreur suppression journal:', error)
       throw error
     }
   }
@@ -152,9 +144,7 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Toutes les entrées du journal supprimées')
     } catch (error) {
-      console.error('❌ Erreur suppression globale journal:', error)
       throw error
     }
   }
@@ -175,7 +165,6 @@ export class DataService {
       
       return data || []
     } catch (error) {
-      console.error('Erreur récupération templates:', error)
       return []
     }
   }
@@ -195,7 +184,6 @@ export class DataService {
       
       return data || []
     } catch (error) {
-      console.error('Erreur récupération checklist utilisateur:', error)
       return []
     }
   }
@@ -216,10 +204,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Item checklist sauvegardé:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde item checklist:', error)
       throw error
     }
   }
@@ -240,10 +226,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Item checklist mis à jour:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur mise à jour item checklist:', error)
       throw error
     }
   }
@@ -259,9 +243,7 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Item checklist supprimé')
     } catch (error) {
-      console.error('❌ Erreur suppression item checklist:', error)
       throw error
     }
   }
@@ -274,10 +256,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Templates copiés vers checklist utilisateur')
       return true
     } catch (error) {
-      console.error('❌ Erreur copie templates:', error)
       throw error
     }
   }
@@ -297,10 +277,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Session checklist sauvegardée:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde session:', error)
       throw error
     }
   }
@@ -329,7 +307,7 @@ export class DataService {
         .or(`entry_session_id.in.(${sessionIds.join(',')}),exit_session_id.in.(${sessionIds.join(',')})`)
       
       if (tradesError) {
-        console.error('Erreur récupération trades:', tradesError)
+        // Silent error for trades
       }
       
       // Associer les trades aux sessions
@@ -346,7 +324,6 @@ export class DataService {
       
       return sessionsWithTrades
     } catch (error) {
-      console.error('Erreur récupération sessions:', error)
       return []
     }
   }
@@ -361,10 +338,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Session supprimée')
       return true
     } catch (error) {
-      console.error('❌ Erreur suppression session:', error)
       throw error
     }
   }
@@ -378,7 +353,7 @@ export class DataService {
         .eq('user_id', userId)
       
       if (tradesError) {
-        console.error('Erreur suppression trades:', tradesError)
+        // Silent error for trades
       }
       
       // Puis supprimer toutes les sessions
@@ -389,10 +364,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Toutes les sessions supprimées')
       return true
     } catch (error) {
-      console.error('❌ Erreur suppression sessions:', error)
       throw error
     }
   }
@@ -413,7 +386,6 @@ export class DataService {
       
       return data
     } catch (error) {
-      console.error('Erreur récupération trade actif:', error)
       return null
     }
   }
@@ -433,7 +405,6 @@ export class DataService {
       
       return data || []
     } catch (error) {
-      console.error('Erreur récupération trades complétés:', error)
       return []
     }
   }
@@ -449,10 +420,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Trade supprimé')
       return true
     } catch (error) {
-      console.error('❌ Erreur suppression trade:', error)
       throw error
     }
   }
@@ -468,10 +437,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Tous les trades complétés supprimés')
       return true
     } catch (error) {
-      console.error('❌ Erreur suppression trades:', error)
       throw error
     }
   }
@@ -494,10 +461,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Trade actif créé:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur création trade actif:', error)
       throw error
     }
   }
@@ -539,10 +504,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Trade fermé:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur fermeture trade:', error)
       throw error
     }
   }
@@ -565,10 +528,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Analyse IA sauvegardée:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde analyse IA:', error)
       throw error
     }
   }
@@ -587,7 +548,6 @@ export class DataService {
       
       return data || []
     } catch (error) {
-      console.error('Erreur récupération analyses IA:', error)
       return []
     }
   }
@@ -608,10 +568,8 @@ export class DataService {
       
       if (error) throw error
       
-      console.log('✅ Calcul position sauvegardé:', data)
       return data
     } catch (error) {
-      console.error('❌ Erreur sauvegarde calcul:', error)
       throw error
     }
   }
@@ -621,13 +579,10 @@ export class DataService {
   // Migrer les données localStorage vers Supabase
   static async migrateFromLocalStorage(userId) {
     try {
-      console.log('🔄 Migration localStorage → Supabase...')
-      
       // Récupérer les données localStorage
       const localData = this.getLocalStorageData()
       
       if (Object.keys(localData).length === 0) {
-        console.log('ℹ️ Aucune donnée localStorage à migrer')
         return
       }
       
@@ -654,13 +609,10 @@ export class DataService {
         await this.saveTradingJournalEntry(userId, date, entry)
       }
       
-      console.log('✅ Migration réussie')
-      
       // Optionnel : nettoyer localStorage après migration
       // this.clearLocalStorage()
       
     } catch (error) {
-      console.error('❌ Erreur migration:', error)
       throw error
     }
   }
@@ -691,6 +643,5 @@ export class DataService {
         localStorage.removeItem(key)
       }
     })
-    console.log('✅ localStorage nettoyé')
   }
-} 
+}
