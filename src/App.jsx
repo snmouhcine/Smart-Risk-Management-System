@@ -17,6 +17,7 @@ import AdminSettings from './components/admin/AdminSettings'
 import PaymentSuccessAutomatic from './components/PaymentSuccessAutomatic'
 import PaymentCancelled from './components/PaymentCancelled'
 import MaintenanceMode from './components/MaintenanceMode'
+import DebugInfo from './components/admin/DebugInfo'
 
 function App() {
   return (
@@ -141,6 +142,14 @@ function AppContent() {
             element={
               <AdminGuard>
                 <AdminSettings />
+              </AdminGuard>
+            } 
+          />
+          <Route 
+            path="/admin/debug" 
+            element={
+              <AdminGuard>
+                <DebugInfo />
               </AdminGuard>
             } 
           />
