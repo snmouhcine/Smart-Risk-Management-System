@@ -1121,7 +1121,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
   }, [capital, stopLossTicks, riskPerTrade, dailyLossMax, aiRecommendedRisk, aiMaxDailyLoss]);
 
   // Afficher loading pendant le chargement des données
-  if (dataLoading || !isDataLoaded) {
+  if (dataLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">

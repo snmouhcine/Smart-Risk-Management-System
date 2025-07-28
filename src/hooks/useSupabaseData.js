@@ -20,7 +20,9 @@ export const useSupabaseData = () => {
 
   // Charger les données utilisateur
   const loadUserData = async () => {
-    if (!user?.id) return
+    if (!user?.id) {
+      return;
+    }
     
     try {
       setLoading(true)
