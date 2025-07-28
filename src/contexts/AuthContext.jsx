@@ -61,9 +61,14 @@ export const AuthProvider = ({ children }) => {
 
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
         async (event, session) => {
-          setLoading(true)
-          setSession(session)
+          // Uniquement afficher le chargement pour les événements majeurs,
+          // et ignorer les rafraîchissements de token en arrière-plan.
+          if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+            setLoading(true)
+          }
+
           const currentUser = session?.user
+          setSession(session)
           setUser(currentUser ?? null)
           
           if (currentUser) {
@@ -71,6 +76,8 @@ export const AuthProvider = ({ children }) => {
           } else {
             setProfile(null)
           }
+
+          // Toujours s'assurer que le chargement se termine
           setLoading(false)
         }
       )

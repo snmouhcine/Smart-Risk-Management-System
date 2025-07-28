@@ -1,29 +1,12 @@
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { Loader2, CreditCard, AlertTriangle } from 'lucide-react'
-import { loadStripe } from '@stripe/stripe-js'
 import { supabase } from '../../lib/supabase'
 
 const AuthGuard = ({ children }) => {
-  const { user, loading, profile, profileLoading, refreshProfile } = useAuth()
-  const [retryCount, setRetryCount] = useState(0)
+  const { user, loading, profile, profileLoading } = useAuth()
   
-  // If profile is null but user exists, try to refresh
-  useEffect(() => {
-    if (user && !profile && !profileLoading && retryCount < 3) {
-      console.log('Profile missing, attempting refresh...', retryCount)
-      const timer = setTimeout(() => {
-        if (refreshProfile) {
-          refreshProfile()
-        }
-        setRetryCount(prev => prev + 1)
-      }, 1000)
-      
-      return () => clearTimeout(timer)
-    }
-  }, [user, profile, profileLoading, refreshProfile, retryCount])
-
   // Affichage de chargement pendant la vérification d'authentification
   if (loading || profileLoading) {
     return (
