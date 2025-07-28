@@ -129,6 +129,30 @@ serve(async (req) => {
         }
         break
       }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const customerId = invoice.customer as string;
+
+        // Find the user associated with this customer
+        const { data: userProfile, error } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('stripe_customer_id', customerId)
+          .single();
+
+        if (userProfile) {
+          // Update user profile to reflect failed payment and revoke access
+          await supabase
+            .from('user_profiles')
+            .update({
+              is_subscribed: false,
+              subscription_status: 'payment_failed',
+            })
+            .eq('id', userProfile.id);
+        }
+        break;
+      }
     }
 
     return new Response(JSON.stringify({ received: true }), { status: 200 })
