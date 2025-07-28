@@ -422,7 +422,8 @@ const Journal = ({
                   </button>
                   <button
                     onClick={saveDayData}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg font-medium"
+                    disabled={dayData.hasTraded && !dayData.pnl.trim()}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-lg hover:shadow-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Sauvegarder
                   </button>
