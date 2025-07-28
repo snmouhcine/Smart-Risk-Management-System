@@ -15,115 +15,87 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
-
-  const fetchProfile = useCallback(async (user) => {
-    if (!user) {
-      setProfile(null)
-      return
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('id, email, full_name, role, is_subscribed, subscription_end_date')
-        .eq('id', user.id)
-        .single()
-
-      if (error) {
-        console.error("AuthContext Error fetching profile:", error)
-        setProfile(null)
-      } else {
-        setProfile(data)
-      }
-    } catch (e) {
-      console.error("AuthContext Critical error fetching profile:", e)
-      setProfile(null)
-    }
-  }, [])
+  const [loading, setLoading] = useState(true) // Commence en chargement
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      setLoading(true)
-      try {
-        const { data: { session: initialSession } } = await supabase.auth.getSession()
+    // onAuthStateChange gère la session initiale et tous les changements.
+    // Le premier événement reçu est 'INITIAL_SESSION'.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session)
+        const currentUser = session?.user
+        setUser(currentUser ?? null)
 
-        if (initialSession) {
-          setSession(initialSession)
-          setUser(initialSession.user)
-          await fetchProfile(initialSession.user)
-        }
-      } catch (e) {
-        console.error("Error in initial session fetch:", e)
-      } finally {
-        setLoading(false)
-      }
+        if (currentUser) {
+          try {
+            const { data, error } = await supabase
+              .from('user_profiles')
+              .select('id, email, full_name, role, is_subscribed, subscription_end_date')
+              .eq('id', currentUser.id)
+              .single()
 
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          // Uniquement afficher le chargement pour les événements majeurs,
-          // et ignorer les rafraîchissements de token en arrière-plan.
-          if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-            setLoading(true)
-          }
-
-          const currentUser = session?.user
-          setSession(session)
-          setUser(currentUser ?? null)
-          
-          if (currentUser) {
-            await fetchProfile(currentUser)
-          } else {
+            if (error) {
+              console.error("AuthContext: Error fetching profile:", error)
+              setProfile(null)
+            } else {
+              setProfile(data)
+            }
+          } catch (e) {
+            console.error("AuthContext: Critical error fetching profile:", e)
             setProfile(null)
           }
-
-          // Toujours s'assurer que le chargement se termine
-          setLoading(false)
+        } else {
+          setProfile(null)
         }
-      )
-
-      return () => {
-        subscription.unsubscribe()
+        
+        // Le premier événement (INITIAL_SESSION) désactivera le chargement initial.
+        // Les événements suivants (TOKEN_REFRESHED) mettront à jour les données silencieusement.
+        setLoading(false)
       }
-    }
+    )
 
-    initializeAuth()
-  }, [fetchProfile])
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [])
   
   const refreshProfile = useCallback(async () => {
     if (user) {
       setLoading(true)
-      await fetchProfile(user)
-      setLoading(false)
+      try {
+        const { data, error } = await supabase
+          .from('user_profiles')
+          .select('id, email, full_name, role, is_subscribed, subscription_end_date')
+          .eq('id', user.id)
+          .single()
+
+        if (error) {
+          console.error("AuthContext: Error refreshing profile:", error)
+          setProfile(null)
+        } else {
+          setProfile(data)
+        }
+      } catch (e) {
+        console.error("AuthContext: Critical error on refresh:", e)
+        setProfile(null)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user, fetchProfile])
+  }, [user])
 
+  // Fonctions d'authentification simplifiées
+  const signUp = (email, password, fullName) => 
+    supabase.auth.signUp({ email, password, options: { data: { full_name: fullName } } })
 
-  // Inscription
-  const signUp = (email, password, fullName) => {
-    return supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName } }
-    })
-  }
+  const signIn = (email, password) => 
+    supabase.auth.signInWithPassword({ email, password })
 
-  // Connexion
-  const signIn = (email, password) => {
-    return supabase.auth.signInWithPassword({ email, password })
-  }
+  const signOut = () => 
+    supabase.auth.signOut()
 
-  // Déconnexion
-  const signOut = () => {
-    return supabase.auth.signOut()
-  }
-
-  // Réinitialisation mot de passe
-  const resetPassword = (email) => {
-    return supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    })
-  }
+  const resetPassword = (email) => 
+    supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })
 
   const value = {
     user,
@@ -136,7 +108,7 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     refreshProfile,
     isAuthenticated: !!user,
-    profileLoading: loading, // Utiliser le même état de chargement
+    profileLoading: loading, // `profileLoading` est maintenant un alias de `loading`
     isAdmin: profile?.role === 'admin'
   }
 

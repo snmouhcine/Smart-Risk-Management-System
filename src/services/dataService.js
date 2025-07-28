@@ -298,9 +298,7 @@ export class DataService {
       
       if (!sessions || sessions.length === 0) return []
       
-      // TEMP: Désactivé pour débloquer l'accès en attendant la réparation de la table active_trades
       // Récupérer les trades associés séparément
-      /*
       const sessionIds = sessions.map(s => s.id)
       const { data: trades, error: tradesError } = await supabase
         .from('active_trades')
@@ -311,18 +309,16 @@ export class DataService {
       if (tradesError) {
         // Silent error for trades
       }
-      */
       
       // Associer les trades aux sessions
       const sessionsWithTrades = sessions.map(session => {
-        // const entryTrades = trades?.filter(t => t.entry_session_id === session.id) || []
-        // const exitTrades = trades?.filter(t => t.exit_session_id === session.id) || []
+        const entryTrades = trades?.filter(t => t.entry_session_id === session.id) || []
+        const exitTrades = trades?.filter(t => t.exit_session_id === session.id) || []
         
         return {
           ...session,
-          // Renvoyer des tableaux vides pour éviter de casser l'UI
-          entry_trades: [],
-          exit_trades: []
+          entry_trades: entryTrades,
+          exit_trades: exitTrades
         }
       })
       
@@ -379,9 +375,6 @@ export class DataService {
   // Récupérer le trade actif
   static async getActiveTrade(userId) {
     try {
-      // TEMP: Désactivé pour débloquer l'accès
-      return null
-      
       const { data, error } = await supabase
         .from('active_trades')
         .select('*')
