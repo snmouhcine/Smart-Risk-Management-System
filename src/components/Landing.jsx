@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../contexts/SettingsContext';
 import {
@@ -36,6 +37,7 @@ import {
 
 const Landing = () => {
   const navigate = useNavigate();
+  const { t, i18n } = useTranslation();
   const { settings } = useSettings();
   const [isScrolled, setIsScrolled] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState(null);
@@ -137,24 +139,36 @@ const Landing = () => {
             </div>
             
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-slate-700 hover:text-purple-600 transition-colors">Features</a>
-              <a href="#benefits" className="text-slate-700 hover:text-purple-600 transition-colors">Benefits</a>
-              <a href="#pricing" className="text-slate-700 hover:text-purple-600 transition-colors">Pricing</a>
-              <a href="#testimonials" className="text-slate-700 hover:text-purple-600 transition-colors">Testimonials</a>
+              <a href="#features" className="text-slate-700 hover:text-purple-600 transition-colors">{t('features')}</a>
+              <a href="#benefits" className="text-slate-700 hover:text-purple-600 transition-colors">{t('benefits')}</a>
+              <a href="#pricing" className="text-slate-700 hover:text-purple-600 transition-colors">{t('pricing')}</a>
+              <a href="#testimonials" className="text-slate-700 hover:text-purple-600 transition-colors">{t('testimonials')}</a>
             </div>
             
             <div className="flex items-center space-x-4">
+              {/* Language Selector */}
+              <div className="relative">
+                <select 
+                  onChange={(e) => i18n.changeLanguage(e.target.value)}
+                  value={i18n.language}
+                  className="bg-transparent text-slate-700 font-medium cursor-pointer focus:outline-none"
+                >
+                  <option value="fr">🇫🇷 FR</option>
+                  <option value="en">🇬🇧 EN</option>
+                </select>
+              </div>
+
               <button
                 onClick={() => navigate('/auth')}
                 className="px-4 py-2 text-purple-600 hover:text-purple-700 font-medium"
               >
-                Login
+                {t('login')}
               </button>
               <button
                 onClick={() => navigate('/auth')}
                 className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-lg hover:shadow-lg transform hover:scale-105 transition-all duration-200 font-medium"
               >
-                Start Free Trial
+                {t('start_free_trial')}
               </button>
             </div>
           </div>
@@ -174,19 +188,19 @@ const Landing = () => {
             {/* Badge */}
             <div className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4 mr-2" />
-              {settings.hero_badge?.fr || 'Trusted by 5,420+ Professional Traders'}
+              {settings.hero_badge?.[i18n.language] || settings.hero_badge?.fr}
             </div>
             
             {/* Main headline */}
             <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 leading-tight">
-              {settings.hero_title?.fr || 'Transform Your Trading with'}
+              {settings.hero_title?.[i18n.language] || settings.hero_title?.fr}
               <span className="block bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                {settings.hero_title_highlight?.fr || 'Intelligent Risk Management'}
+                {settings.hero_title_highlight?.[i18n.language] || settings.hero_title_highlight?.fr}
               </span>
             </h1>
             
             <p className="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto mb-8">
-              {settings.hero_subtitle?.fr || 'Stop losing money to poor risk management. Our AI-powered platform helps you make smarter trades, protect your capital, and achieve consistent profitability.'}
+              {settings.hero_subtitle?.[i18n.language] || settings.hero_subtitle?.fr}
             </p>
             
             {/* CTA Buttons */}
@@ -195,14 +209,14 @@ const Landing = () => {
                 onClick={() => navigate('/auth')}
                 className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center"
               >
-                {settings.hero_cta_main?.fr || 'Start 14-Day Free Trial'}
+                {settings.hero_cta_main?.[i18n.language] || settings.hero_cta_main?.fr}
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 className="px-8 py-4 bg-white text-purple-600 rounded-xl text-lg font-semibold border-2 border-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-200 flex items-center"
               >
                 <Play className="w-5 h-5 mr-2" />
-                {settings.hero_cta_secondary?.fr || 'Watch Demo'}
+                {settings.hero_cta_secondary?.[i18n.language] || settings.hero_cta_secondary?.fr}
               </button>
             </div>
             
@@ -210,15 +224,15 @@ const Landing = () => {
             <div className="mt-8 flex items-center justify-center space-x-8 text-sm text-slate-500">
               <div className="flex items-center">
                 <CheckCircle className="w-5 h-5 text-green-500 mr-1" />
-                {settings.hero_trust_1?.fr || 'No credit card required'}
+                {settings.hero_trust_1?.[i18n.language] || settings.hero_trust_1?.fr}
               </div>
               <div className="flex items-center">
                 <Shield className="w-5 h-5 text-blue-500 mr-1" />
-                {settings.hero_trust_2?.fr || 'Bank-level security'}
+                {settings.hero_trust_2?.[i18n.language] || settings.hero_trust_2?.fr}
               </div>
               <div className="flex items-center">
                 <Clock className="w-5 h-5 text-purple-500 mr-1" />
-                {settings.hero_trust_3?.fr || 'Setup in 2 minutes'}
+                {settings.hero_trust_3?.[i18n.language] || settings.hero_trust_3?.fr}
               </div>
             </div>
           </div>
@@ -260,11 +274,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              {settings.features_title?.fr || "Everything You Need to"}
-              <span className="text-purple-600"> {settings.features_title_highlight?.fr || "Trade Smarter"}</span>
+              {settings.features_title?.[i18n.language] || settings.features_title?.fr}
+              <span className="text-purple-600"> {settings.features_title_highlight?.[i18n.language] || settings.features_title_highlight?.fr}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              {settings.features_subtitle?.fr || "Our comprehensive suite of tools gives you the edge you need in today's volatile markets"}
+              {settings.features_subtitle?.[i18n.language] || settings.features_subtitle?.fr}
             </p>
           </div>
           
@@ -446,11 +460,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              {settings.benefits_title?.fr || "Why Traders Choose"}
-              <span className="text-purple-600"> {settings.benefits_title_highlight?.fr || "Smart Risk Manager"}</span>
+              {settings.benefits_title?.[i18n.language] || settings.benefits_title?.fr}
+              <span className="text-purple-600"> {settings.benefits_title_highlight?.[i18n.language] || settings.benefits_title_highlight?.fr}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              {settings.benefits_subtitle?.fr || "Join thousands of profitable traders who transformed their results"}
+              {settings.benefits_subtitle?.[i18n.language] || settings.benefits_subtitle?.fr}
             </p>
           </div>
 
@@ -542,11 +556,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              {settings.pricing_title?.fr || "Choose Your Path to"}
-              <span className="text-purple-600"> {settings.pricing_title_highlight?.fr || "Profitable Trading"}</span>
+              {settings.pricing_title?.[i18n.language] || settings.pricing_title?.fr}
+              <span className="text-purple-600"> {settings.pricing_title_highlight?.[i18n.language] || settings.pricing_title_highlight?.fr}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              {settings.pricing_subtitle?.fr || "Start with our 14-day free trial. No credit card required."}
+              {settings.pricing_subtitle?.[i18n.language] || settings.pricing_subtitle?.fr}
             </p>
           </div>
 
@@ -574,7 +588,7 @@ const Landing = () => {
                     {isMiddlePlan && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                         <span className="px-4 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-full">
-                          {settings.pricing_popular_badge?.fr || "MOST POPULAR"}
+                          {settings.pricing_popular_badge?.[i18n.language] || settings.pricing_popular_badge?.fr}
                         </span>
                       </div>
                     )}
@@ -605,7 +619,7 @@ const Landing = () => {
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
-                      {settings.pricing_cta_button?.fr || "Commencer l'essai gratuit"}
+                      {settings.pricing_cta_button?.[i18n.language] || settings.pricing_cta_button?.fr}
                     </button>
                   </div>
                 );
@@ -621,7 +635,7 @@ const Landing = () => {
           <div className="text-center mt-12">
             <div className="inline-flex items-center px-6 py-3 bg-green-50 rounded-full">
               <Shield className="w-5 h-5 text-green-600 mr-2" />
-              <span className="text-green-800 font-medium">{settings.pricing_guarantee?.fr || "30-Day Money-Back Guarantee"}</span>
+              <span className="text-green-800 font-medium">{settings.pricing_guarantee?.[i18n.language] || settings.pricing_guarantee?.fr}</span>
             </div>
           </div>
         </div>
@@ -632,11 +646,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              {settings.testimonials_title?.fr || "Trusted by"}
-              <span className="text-purple-600"> {settings.testimonials_title_highlight?.fr || "Successful Traders"}</span>
+              {settings.testimonials_title?.[i18n.language] || settings.testimonials_title?.fr}
+              <span className="text-purple-600"> {settings.testimonials_title_highlight?.[i18n.language] || settings.testimonials_title_highlight?.fr}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              {settings.testimonials_subtitle?.fr || "See what our users say about their transformation"}
+              {settings.testimonials_subtitle?.[i18n.language] || settings.testimonials_subtitle?.fr}
             </p>
           </div>
 
@@ -712,25 +726,25 @@ const Landing = () => {
       <section className="py-20 px-4 bg-gradient-to-r from-purple-600 to-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              {settings.final_cta_title?.fr || "Ready to Transform Your Trading?"}
+              {settings.final_cta_title?.[i18n.language] || settings.final_cta_title?.fr}
             </h2>
             <p className="text-xl text-purple-100 mb-8">
-              {settings.final_cta_subtitle?.fr || "Join 5,420+ traders who are already using Smart Risk Manager to protect their capital and maximize profits."}
+              {settings.final_cta_subtitle?.[i18n.language] || settings.final_cta_subtitle?.fr}
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
               <button
                 onClick={() => navigate('/auth')}
                 className="group px-8 py-4 bg-white text-purple-600 rounded-xl text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center"
               >
-                {settings.final_cta_button1?.fr || "Start Your Free Trial"}
+                {settings.final_cta_button1?.[i18n.language] || settings.final_cta_button1?.fr}
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </button>
               <button className="px-8 py-4 bg-purple-700 text-white rounded-xl text-lg font-semibold hover:bg-purple-800 transition-all duration-200">
-                {settings.final_cta_button2?.fr || "Schedule a Demo"}
+                {settings.final_cta_button2?.[i18n.language] || settings.final_cta_button2?.fr}
               </button>
             </div>
             <p className="text-purple-200 mt-6 text-sm">
-              {settings.final_cta_subtext?.fr || "No credit card required • 14-day free trial • Cancel anytime"}
+              {settings.final_cta_subtext?.[i18n.language] || settings.final_cta_subtext?.fr}
             </p>
         </div>
       </section>
