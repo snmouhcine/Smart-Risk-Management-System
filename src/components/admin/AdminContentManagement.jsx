@@ -155,8 +155,149 @@ const AdminContentManagement = () => {
            <TranslatableInput label="Garantie" fieldKey="pricing_guarantee" settings={settings} handleValueChange={handleValueChange} />
         </ContentSection>
 
-        {/* Note: Managing dynamic lists like testimonials or footer links requires a more complex UI. 
-            This version focuses on text content. The structure is ready for expansion. */}
+        {/* Feature Boxes */}
+        <ContentSection title="Feature 1: AI-Powered Analysis">
+          <TranslatableInput label="Titre" fieldKey="feature_1_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_1_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_1_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_1_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_1_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Feature 2: Smart Risk Management">
+          <TranslatableInput label="Titre" fieldKey="feature_2_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_2_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_2_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_2_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_2_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Feature 3: Advanced Journal">
+          <TranslatableInput label="Titre" fieldKey="feature_3_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_3_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_3_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_3_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_3_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Feature 4: Real-Time Analytics">
+          <TranslatableInput label="Titre" fieldKey="feature_4_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_4_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_4_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_4_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_4_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Feature 5: Trading Checklist">
+          <TranslatableInput label="Titre" fieldKey="feature_5_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_5_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_5_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_5_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_5_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Feature 6: Position Calculator">
+          <TranslatableInput label="Titre" fieldKey="feature_6_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="feature_6_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Point 1" fieldKey="feature_6_item_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 2" fieldKey="feature_6_item_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Point 3" fieldKey="feature_6_item_3" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        {/* Benefit Boxes */}
+        <ContentSection title="Benefit 1: Win Rate">
+          <TranslatableInput label="Titre" fieldKey="benefit_1_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="benefit_1_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+        </ContentSection>
+
+        <ContentSection title="Benefit 2: Capital Protection">
+          <TranslatableInput label="Titre" fieldKey="benefit_2_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="benefit_2_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+        </ContentSection>
+
+        <ContentSection title="Benefit 3: Learning">
+          <TranslatableInput label="Titre" fieldKey="benefit_3_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="benefit_3_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+        </ContentSection>
+
+        <ContentSection title="Benefit 4: Time Saving">
+          <TranslatableInput label="Titre" fieldKey="benefit_4_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Description" fieldKey="benefit_4_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+        </ContentSection>
+
+        {/* ROI Calculator */}
+        <ContentSection title="ROI Calculator">
+          <TranslatableInput label="Titre" fieldKey="roi_calculator_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Label 1" fieldKey="roi_calculator_label_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Label 2" fieldKey="roi_calculator_label_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Label 3" fieldKey="roi_calculator_label_3" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Disclaimer" fieldKey="roi_calculator_disclaimer" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        {/* Testimonials Section */}
+        <ContentSection title="Section Testimonials">
+          <TranslatableInput label="Titre" fieldKey="testimonials_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Titre (partie colorée)" fieldKey="testimonials_title_highlight" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Sous-titre" fieldKey="testimonials_subtitle" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+        </ContentSection>
+
+        {/* Individual Testimonials */}
+        <ContentSection title="Testimonial 1">
+          <TranslatableInput label="Texte" fieldKey="testimonial_1_text" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Nom" fieldKey="testimonial_1_name" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Rôle" fieldKey="testimonial_1_role" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Testimonial 2">
+          <TranslatableInput label="Texte" fieldKey="testimonial_2_text" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Nom" fieldKey="testimonial_2_name" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Rôle" fieldKey="testimonial_2_role" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Testimonial 3">
+          <TranslatableInput label="Texte" fieldKey="testimonial_3_text" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Nom" fieldKey="testimonial_3_name" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Rôle" fieldKey="testimonial_3_role" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        {/* Final CTA Section */}
+        <ContentSection title="Section CTA Final">
+          <TranslatableInput label="Titre" fieldKey="final_cta_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Sous-titre" fieldKey="final_cta_subtitle" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Bouton 1" fieldKey="final_cta_button1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Bouton 2" fieldKey="final_cta_button2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Sous-texte" fieldKey="final_cta_subtext" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        {/* Footer Section */}
+        <ContentSection title="Footer">
+          <TranslatableInput label="Description" fieldKey="footer_description" settings={settings} handleValueChange={handleValueChange} type="textarea" />
+          <TranslatableInput label="Copyright" fieldKey="footer_copyright" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Footer Section 1: Produit">
+          <TranslatableInput label="Titre" fieldKey="footer_section_1_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 1" fieldKey="footer_section_1_link_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 2" fieldKey="footer_section_1_link_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 3" fieldKey="footer_section_1_link_3" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 4" fieldKey="footer_section_1_link_4" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Footer Section 2: Entreprise">
+          <TranslatableInput label="Titre" fieldKey="footer_section_2_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 1" fieldKey="footer_section_2_link_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 2" fieldKey="footer_section_2_link_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 3" fieldKey="footer_section_2_link_3" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 4" fieldKey="footer_section_2_link_4" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
+
+        <ContentSection title="Footer Section 3: Légal">
+          <TranslatableInput label="Titre" fieldKey="footer_section_3_title" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 1" fieldKey="footer_section_3_link_1" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 2" fieldKey="footer_section_3_link_2" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 3" fieldKey="footer_section_3_link_3" settings={settings} handleValueChange={handleValueChange} />
+          <TranslatableInput label="Lien 4" fieldKey="footer_section_3_link_4" settings={settings} handleValueChange={handleValueChange} />
+        </ContentSection>
 
       </div>
     </AdminLayout>

@@ -281,7 +281,91 @@ export const SettingsProvider = ({ children }) => {
       final_cta_subtitle: 'landing_page',
       final_cta_button1: 'landing_page',
       final_cta_button2: 'landing_page',
-      final_cta_subtext: 'landing_page'
+      final_cta_subtext: 'landing_page',
+      
+      // Feature content
+      feature_1_title: 'landing_page',
+      feature_1_description: 'landing_page',
+      feature_1_item_1: 'landing_page',
+      feature_1_item_2: 'landing_page',
+      feature_1_item_3: 'landing_page',
+      
+      feature_2_title: 'landing_page',
+      feature_2_description: 'landing_page',
+      feature_2_item_1: 'landing_page',
+      feature_2_item_2: 'landing_page',
+      feature_2_item_3: 'landing_page',
+      
+      feature_3_title: 'landing_page',
+      feature_3_description: 'landing_page',
+      feature_3_item_1: 'landing_page',
+      feature_3_item_2: 'landing_page',
+      feature_3_item_3: 'landing_page',
+      
+      feature_4_title: 'landing_page',
+      feature_4_description: 'landing_page',
+      feature_4_item_1: 'landing_page',
+      feature_4_item_2: 'landing_page',
+      feature_4_item_3: 'landing_page',
+      
+      feature_5_title: 'landing_page',
+      feature_5_description: 'landing_page',
+      feature_5_item_1: 'landing_page',
+      feature_5_item_2: 'landing_page',
+      feature_5_item_3: 'landing_page',
+      
+      feature_6_title: 'landing_page',
+      feature_6_description: 'landing_page',
+      feature_6_item_1: 'landing_page',
+      feature_6_item_2: 'landing_page',
+      feature_6_item_3: 'landing_page',
+      
+      // Benefit content
+      benefit_1_title: 'landing_page',
+      benefit_1_description: 'landing_page',
+      benefit_2_title: 'landing_page',
+      benefit_2_description: 'landing_page',
+      benefit_3_title: 'landing_page',
+      benefit_3_description: 'landing_page',
+      benefit_4_title: 'landing_page',
+      benefit_4_description: 'landing_page',
+      
+      // ROI Calculator
+      roi_calculator_title: 'landing_page',
+      roi_calculator_label_1: 'landing_page',
+      roi_calculator_label_2: 'landing_page',
+      roi_calculator_label_3: 'landing_page',
+      roi_calculator_disclaimer: 'landing_page',
+      
+      // Testimonials
+      testimonial_1_text: 'landing_page',
+      testimonial_1_name: 'landing_page',
+      testimonial_1_role: 'landing_page',
+      testimonial_2_text: 'landing_page',
+      testimonial_2_name: 'landing_page',
+      testimonial_2_role: 'landing_page',
+      testimonial_3_text: 'landing_page',
+      testimonial_3_name: 'landing_page',
+      testimonial_3_role: 'landing_page',
+      
+      // Footer content
+      footer_description: 'landing_page',
+      footer_copyright: 'landing_page',
+      footer_section_1_title: 'landing_page',
+      footer_section_1_link_1: 'landing_page',
+      footer_section_1_link_2: 'landing_page',
+      footer_section_1_link_3: 'landing_page',
+      footer_section_1_link_4: 'landing_page',
+      footer_section_2_title: 'landing_page',
+      footer_section_2_link_1: 'landing_page',
+      footer_section_2_link_2: 'landing_page',
+      footer_section_2_link_3: 'landing_page',
+      footer_section_2_link_4: 'landing_page',
+      footer_section_3_title: 'landing_page',
+      footer_section_3_link_1: 'landing_page',
+      footer_section_3_link_2: 'landing_page',
+      footer_section_3_link_3: 'landing_page',
+      footer_section_3_link_4: 'landing_page'
     }
     
     return categoryMap[key] || 'general'

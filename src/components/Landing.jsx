@@ -291,22 +291,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
                   <Brain className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">AI-Powered Analysis</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_1_title?.[i18n.language] || settings.feature_1_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Get instant insights from our advanced AI that analyzes your trading patterns and suggests improvements
+                  {settings.feature_1_description?.[i18n.language] || settings.feature_1_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Real-time trade analysis
+                    {settings.feature_1_item_1?.[i18n.language] || settings.feature_1_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Personalized recommendations
+                    {settings.feature_1_item_2?.[i18n.language] || settings.feature_1_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Risk assessment alerts
+                    {settings.feature_1_item_3?.[i18n.language] || settings.feature_1_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -319,22 +319,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4">
                   <Shield className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Smart Risk Management</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_2_title?.[i18n.language] || settings.feature_2_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Never blow up your account again with our intelligent position sizing and risk controls
+                  {settings.feature_2_description?.[i18n.language] || settings.feature_2_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Automatic position sizing
+                    {settings.feature_2_item_1?.[i18n.language] || settings.feature_2_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Dynamic stop-loss calculation
+                    {settings.feature_2_item_2?.[i18n.language] || settings.feature_2_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Risk-reward optimization
+                    {settings.feature_2_item_3?.[i18n.language] || settings.feature_2_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -347,22 +347,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
                   <FileText className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Advanced Journal</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_3_title?.[i18n.language] || settings.feature_3_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Track every trade with detailed analytics and learn from your patterns
+                  {settings.feature_3_description?.[i18n.language] || settings.feature_3_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Automated trade logging
+                    {settings.feature_3_item_1?.[i18n.language] || settings.feature_3_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Performance metrics
+                    {settings.feature_3_item_2?.[i18n.language] || settings.feature_3_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Pattern recognition
+                    {settings.feature_3_item_3?.[i18n.language] || settings.feature_3_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -375,22 +375,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center mb-4">
                   <BarChart3 className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Real-Time Analytics</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_4_title?.[i18n.language] || settings.feature_4_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Visualize your performance with beautiful charts and actionable insights
+                  {settings.feature_4_description?.[i18n.language] || settings.feature_4_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    P&L tracking
+                    {settings.feature_4_item_1?.[i18n.language] || settings.feature_4_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Win rate analysis
+                    {settings.feature_4_item_2?.[i18n.language] || settings.feature_4_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Daily performance stats
+                    {settings.feature_4_item_3?.[i18n.language] || settings.feature_4_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -403,22 +403,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center mb-4">
                   <CheckCircle className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Trading Checklist</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_5_title?.[i18n.language] || settings.feature_5_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Never miss a critical step with our customizable pre-trade and exit checklists
+                  {settings.feature_5_description?.[i18n.language] || settings.feature_5_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Entry validation
+                    {settings.feature_5_item_1?.[i18n.language] || settings.feature_5_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Exit criteria tracking
+                    {settings.feature_5_item_2?.[i18n.language] || settings.feature_5_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Score-based decisions
+                    {settings.feature_5_item_3?.[i18n.language] || settings.feature_5_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -431,22 +431,22 @@ const Landing = () => {
                 <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center mb-4">
                   <Calculator className="w-7 h-7 text-white" />
                 </div>
-                <h3 className="text-2xl font-bold text-slate-900 mb-3">Position Calculator</h3>
+                <h3 className="text-2xl font-bold text-slate-900 mb-3">{settings.feature_6_title?.[i18n.language] || settings.feature_6_title?.fr}</h3>
                 <p className="text-slate-600 mb-4">
-                  Calculate perfect position sizes for futures contracts in seconds
+                  {settings.feature_6_description?.[i18n.language] || settings.feature_6_description?.fr}
                 </p>
                 <ul className="space-y-2">
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Multi-contract support
+                    {settings.feature_6_item_1?.[i18n.language] || settings.feature_6_item_1?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Risk percentage based
+                    {settings.feature_6_item_2?.[i18n.language] || settings.feature_6_item_2?.fr}
                   </li>
                   <li className="flex items-center text-sm text-slate-700">
                     <Check className="w-4 h-4 text-green-500 mr-2" />
-                    Real-time calculations
+                    {settings.feature_6_item_3?.[i18n.language] || settings.feature_6_item_3?.fr}
                   </li>
                 </ul>
               </div>
@@ -476,9 +476,9 @@ const Landing = () => {
                   <TrendingUp className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Increase Your Win Rate by 40%</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">{settings.benefit_1_title?.[i18n.language] || settings.benefit_1_title?.fr}</h3>
                   <p className="text-slate-600">
-                    Our users report an average 40% increase in their win rate within the first 30 days of using our systematic approach.
+                    {settings.benefit_1_description?.[i18n.language] || settings.benefit_1_description?.fr}
                   </p>
                 </div>
               </div>
@@ -490,9 +490,9 @@ const Landing = () => {
                   <Shield className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Protect Your Capital</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">{settings.benefit_2_title?.[i18n.language] || settings.benefit_2_title?.fr}</h3>
                   <p className="text-slate-600">
-                    Never risk more than you should. Our smart position sizing ensures you stay in the game long-term.
+                    {settings.benefit_2_description?.[i18n.language] || settings.benefit_2_description?.fr}
                   </p>
                 </div>
               </div>
@@ -504,9 +504,9 @@ const Landing = () => {
                   <Brain className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Learn From Every Trade</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">{settings.benefit_3_title?.[i18n.language] || settings.benefit_3_title?.fr}</h3>
                   <p className="text-slate-600">
-                    Our AI analyzes your patterns and provides personalized insights to continuously improve your edge.
+                    {settings.benefit_3_description?.[i18n.language] || settings.benefit_3_description?.fr}
                   </p>
                 </div>
               </div>
@@ -518,9 +518,9 @@ const Landing = () => {
                   <Clock className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-slate-900 mb-2">Save 10+ Hours Per Week</h3>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2">{settings.benefit_4_title?.[i18n.language] || settings.benefit_4_title?.fr}</h3>
                   <p className="text-slate-600">
-                    Automate your journaling, calculations, and analysis. Focus on what matters - making profitable trades.
+                    {settings.benefit_4_description?.[i18n.language] || settings.benefit_4_description?.fr}
                   </p>
                 </div>
               </div>
@@ -529,23 +529,23 @@ const Landing = () => {
 
           {/* ROI Calculator */}
           <div className="bg-white rounded-3xl shadow-xl p-8 md:p-12 max-w-4xl mx-auto">
-            <h3 className="text-2xl font-bold text-center mb-8">See Your Potential ROI</h3>
+            <h3 className="text-2xl font-bold text-center mb-8">{settings.roi_calculator_title?.[i18n.language] || settings.roi_calculator_title?.fr}</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <div className="text-center">
-                <p className="text-sm text-slate-600 mb-2">If you trade with</p>
+                <p className="text-sm text-slate-600 mb-2">{settings.roi_calculator_label_1?.[i18n.language] || settings.roi_calculator_label_1?.fr}</p>
                 <p className="text-3xl font-bold text-slate-900">$10,000</p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-slate-600 mb-2">Improving win rate by</p>
+                <p className="text-sm text-slate-600 mb-2">{settings.roi_calculator_label_2?.[i18n.language] || settings.roi_calculator_label_2?.fr}</p>
                 <p className="text-3xl font-bold text-purple-600">+15%</p>
               </div>
               <div className="text-center">
-                <p className="text-sm text-slate-600 mb-2">Could mean extra</p>
+                <p className="text-sm text-slate-600 mb-2">{settings.roi_calculator_label_3?.[i18n.language] || settings.roi_calculator_label_3?.fr}</p>
                 <p className="text-3xl font-bold text-green-600">$24,000/year</p>
               </div>
             </div>
             <p className="text-center text-sm text-slate-500 mt-6">
-              *Based on average user results. Individual results may vary.
+              {settings.roi_calculator_disclaimer?.[i18n.language] || settings.roi_calculator_disclaimer?.fr}
             </p>
           </div>
         </div>
@@ -663,16 +663,15 @@ const Landing = () => {
                 ))}
               </div>
               <p className="text-slate-700 mb-6">
-                "This platform completely changed my trading. My win rate went from 45% to 73% in just 2 months. 
-                The AI insights are incredibly accurate."
+                "{settings.testimonial_1_text?.[i18n.language] || settings.testimonial_1_text?.fr}"
               </p>
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
                   <span className="text-purple-600 font-bold">JR</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">James Rodriguez</p>
-                  <p className="text-sm text-slate-600">Futures Trader</p>
+                  <p className="font-semibold text-slate-900">{settings.testimonial_1_name?.[i18n.language] || settings.testimonial_1_name?.fr}</p>
+                  <p className="text-sm text-slate-600">{settings.testimonial_1_role?.[i18n.language] || settings.testimonial_1_role?.fr}</p>
                 </div>
               </div>
             </div>
@@ -684,16 +683,15 @@ const Landing = () => {
                 ))}
               </div>
               <p className="text-slate-700 mb-6">
-                "The position calculator alone saved me from countless bad trades. I can't imagine trading without 
-                this tool anymore. Worth every penny!"
+                "{settings.testimonial_2_text?.[i18n.language] || settings.testimonial_2_text?.fr}"
               </p>
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                   <span className="text-green-600 font-bold">SK</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Sarah Kim</p>
-                  <p className="text-sm text-slate-600">Day Trader</p>
+                  <p className="font-semibold text-slate-900">{settings.testimonial_2_name?.[i18n.language] || settings.testimonial_2_name?.fr}</p>
+                  <p className="text-sm text-slate-600">{settings.testimonial_2_role?.[i18n.language] || settings.testimonial_2_role?.fr}</p>
                 </div>
               </div>
             </div>
@@ -705,16 +703,15 @@ const Landing = () => {
                 ))}
               </div>
               <p className="text-slate-700 mb-6">
-                "Finally, a trading tool that focuses on risk management! My account has grown 240% since I started 
-                using Smart Risk Manager."
+                "{settings.testimonial_3_text?.[i18n.language] || settings.testimonial_3_text?.fr}"
               </p>
               <div className="flex items-center space-x-3">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 font-bold">MT</span>
                 </div>
                 <div>
-                  <p className="font-semibold text-slate-900">Michael Thompson</p>
-                  <p className="text-sm text-slate-600">Swing Trader</p>
+                  <p className="font-semibold text-slate-900">{settings.testimonial_3_name?.[i18n.language] || settings.testimonial_3_name?.fr}</p>
+                  <p className="text-sm text-slate-600">{settings.testimonial_3_role?.[i18n.language] || settings.testimonial_3_role?.fr}</p>
                 </div>
               </div>
             </div>
@@ -761,43 +758,43 @@ const Landing = () => {
                 <span className="text-xl font-bold text-white">Smart Risk Manager</span>
               </div>
               <p className="text-sm">
-                Professional trading risk management platform trusted by thousands of traders worldwide.
+                {settings.footer_description?.[i18n.language] || settings.footer_description?.fr}
               </p>
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
+              <h4 className="text-white font-semibold mb-4">{settings.footer_section_1_title?.[i18n.language] || settings.footer_section_1_title?.fr}</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">API Docs</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Integrations</a></li>
+                <li><a href="#features" className="hover:text-white transition-colors">{settings.footer_section_1_link_1?.[i18n.language] || settings.footer_section_1_link_1?.fr}</a></li>
+                <li><a href="#pricing" className="hover:text-white transition-colors">{settings.footer_section_1_link_2?.[i18n.language] || settings.footer_section_1_link_2?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_1_link_3?.[i18n.language] || settings.footer_section_1_link_3?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_1_link_4?.[i18n.language] || settings.footer_section_1_link_4?.fr}</a></li>
               </ul>
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
+              <h4 className="text-white font-semibold mb-4">{settings.footer_section_2_title?.[i18n.language] || settings.footer_section_2_title?.fr}</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_2_link_1?.[i18n.language] || settings.footer_section_2_link_1?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_2_link_2?.[i18n.language] || settings.footer_section_2_link_2?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_2_link_3?.[i18n.language] || settings.footer_section_2_link_3?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_2_link_4?.[i18n.language] || settings.footer_section_2_link_4?.fr}</a></li>
               </ul>
             </div>
             
             <div>
-              <h4 className="text-white font-semibold mb-4">Legal</h4>
+              <h4 className="text-white font-semibold mb-4">{settings.footer_section_3_title?.[i18n.language] || settings.footer_section_3_title?.fr}</h4>
               <ul className="space-y-2 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Security</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">GDPR</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_3_link_1?.[i18n.language] || settings.footer_section_3_link_1?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_3_link_2?.[i18n.language] || settings.footer_section_3_link_2?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_3_link_3?.[i18n.language] || settings.footer_section_3_link_3?.fr}</a></li>
+                <li><a href="#" className="hover:text-white transition-colors">{settings.footer_section_3_link_4?.[i18n.language] || settings.footer_section_3_link_4?.fr}</a></li>
               </ul>
             </div>
           </div>
           
           <div className="border-t border-slate-800 mt-8 pt-8 text-center text-sm">
-            <p>&copy; 2024 Smart Risk Manager. All rights reserved.</p>
+            <p>{settings.footer_copyright?.[i18n.language] || settings.footer_copyright?.fr}</p>
           </div>
         </div>
       </footer>
