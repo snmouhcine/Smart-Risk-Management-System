@@ -91,6 +91,7 @@ export const SettingsProvider = ({ children }) => {
       if (funcData && Object.keys(funcData).length > 0) {
         const parsedSettings = parseSettings(funcData);
         setSettings(prev => ({ ...prev, ...parsedSettings }));
+        setLoading(false);
         return; // Success, we are done.
       }
       
