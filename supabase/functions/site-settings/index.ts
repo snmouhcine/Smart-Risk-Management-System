@@ -7,140 +7,89 @@ const supabase = createClient(
 )
 
 serve(async (req) => {
-  // Handle CORS
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      },
-    })
+    return new Response('ok', { headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    }});
   }
 
   try {
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      return new Response('Unauthorized', { status: 401 })
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    
-    if (authError || !user) {
-      return new Response('Unauthorized', { status: 401 })
-    }
-
-    // Handle GET request - fetch all settings
+    // Handle GET request - fetch PUBLIC settings for everyone
     if (req.method === 'GET') {
       const { data: settings, error } = await supabase
         .from('site_settings')
         .select('*')
+        .in('category', ['landing_page', 'general', 'appearance']);
 
-      if (error) throw error
+      if (error) throw error;
 
-      // Transform array to object
       const settingsObject = settings.reduce((acc, setting) => {
-        acc[setting.key] = setting.value
-        return acc
-      }, {})
+        acc[setting.key] = setting.value;
+        return acc;
+      }, {});
 
-      return new Response(
-        JSON.stringify(settingsObject),
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-          },
-          status: 200
-        }
-      )
+      return new Response(JSON.stringify(settingsObject), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        status: 200,
+      });
     }
 
-    // Handle POST request - update settings
+    // Handle POST request - secure update for admins only
     if (req.method === 'POST') {
-      // Check if user is admin for write operations
+      // Step 1: Verify authentication
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) return new Response('Unauthorized', { status: 401 });
+      
+      const token = authHeader.replace('Bearer ', '');
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+      if (authError || !user) return new Response('Unauthorized', { status: 401 });
+
+      // Step 2: Verify if the user is an admin
       const { data: profile } = await supabase
         .from('user_profiles')
-        .select('is_admin')
+        .select('role')
         .eq('id', user.id)
-        .single()
-
-      if (!profile?.is_admin) {
-        return new Response('Forbidden', { status: 403 })
+        .single();
+        
+      if (profile?.role !== 'admin') {
+        return new Response('Forbidden: You must be an admin to update settings.', { status: 403 });
       }
 
-      const updates = await req.json()
-
-      // Update each setting
-      const promises = Object.entries(updates).map(([key, value]) => {
-        return supabase
-          .from('site_settings')
-          .upsert({
+      // Step 3: Process the update
+      const updates = await req.json();
+      const promises = Object.entries(updates).map(([key, value]) => 
+        supabase.from('site_settings').upsert({
             key,
-            value: JSON.stringify(value),
+            value: value, // The admin panel already stringifies the JSON
             category: getCategoryForKey(key),
             updated_at: new Date().toISOString(),
-            updated_by: user.id
-          }, {
-            onConflict: 'key'
-          })
-      })
+            updated_by: user.id,
+          }, { onConflict: 'key' })
+      );
 
-      const results = await Promise.all(promises)
-      
-      // Check for errors
-      const errors = results.filter(r => r.error)
-      if (errors.length > 0) {
-        throw new Error(errors[0].error.message)
-      }
+      const results = await Promise.all(promises);
+      const errors = results.filter(r => r.error);
+      if (errors.length > 0) throw new Error(errors[0].error.message);
 
-      // Return updated settings
-      const { data: settings, error } = await supabase
-        .from('site_settings')
-        .select('*')
-
-      if (error) throw error
-
-      const settingsObject = settings.reduce((acc, setting) => {
-        acc[setting.key] = setting.value
-        return acc
-      }, {})
-
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          settings: settingsObject 
-        }),
-        {
-          headers: { 
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-          },
-          status: 200
-        }
-      )
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        status: 200,
+      });
     }
 
-    return new Response('Method not allowed', { status: 405 })
+    return new Response('Method not allowed', { status: 405 });
 
   } catch (error) {
-    // Error in site-settings function
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*'
-        },
-        status: 400
+    return new Response(JSON.stringify({ error: error.message }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        status: 400,
       }
-    )
+    );
   }
-})
+});
 
 function getCategoryForKey(key: string): string {
   const categoryMap: Record<string, string> = {
