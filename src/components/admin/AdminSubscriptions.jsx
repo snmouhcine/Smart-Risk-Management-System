@@ -72,10 +72,11 @@ const AdminSubscriptions = () => {
         .select(`
           id,
           is_subscribed,
+          subscription_status,
           stripe_subscription_id,
           subscription_plan_id
         `)
-        .eq('is_subscribed', true)
+        .eq('subscription_status', 'active')
 
       // Get active plans count
       const { count: activePlans } = await supabase

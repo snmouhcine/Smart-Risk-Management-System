@@ -75,7 +75,7 @@ const UserManagementFixed = () => {
       const enrichedUsers = (profilesData || []).map(user => ({
         ...user,
         // Add display fields
-        status: user.is_subscribed ? 'active' : 'inactive',
+        status: user.subscription_status === 'active' ? 'Abonné' : 'Inactif',
         display_role: user.role === 'admin' ? 'Admin' : 'User',
         // Format dates
         formatted_created_at: user.created_at ? new Date(user.created_at).toLocaleDateString() : 'N/A'
@@ -108,8 +108,8 @@ const UserManagementFixed = () => {
     // Subscription filter
     if (filterSubscription !== 'all') {
       filtered = filtered.filter(user => {
-        if (filterSubscription === 'subscribed') return user.is_subscribed
-        if (filterSubscription === 'unsubscribed') return !user.is_subscribed
+        if (filterSubscription === 'subscribed') return user.subscription_status === 'active'
+        if (filterSubscription === 'unsubscribed') return user.subscription_status !== 'active'
         return true
       })
     }
@@ -140,7 +140,8 @@ const UserManagementFixed = () => {
     setEditForm({
       email: user.email,
       role: user.role,
-      is_subscribed: user.is_subscribed
+      is_subscribed: user.is_subscribed,
+      subscription_status: user.subscription_status || 'inactive'
     })
     setShowEditModal(true)
   }
@@ -151,7 +152,8 @@ const UserManagementFixed = () => {
         .from('user_profiles')
         .update({
           role: editForm.role,
-          is_subscribed: editForm.is_subscribed
+          is_subscribed: editForm.is_subscribed,
+          subscription_status: editForm.subscription_status
         })
         .eq('id', selectedUser.id)
 
@@ -322,11 +324,11 @@ const UserManagementFixed = () => {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          user.is_subscribed
+                          user.status === 'Abonné'
                             ? 'bg-green-100/20 text-green-400 border border-green-400/30'
                             : 'bg-red-100/20 text-red-400 border border-red-400/30'
                         }`}>
-                          {user.is_subscribed ? (
+                          {user.status === 'Abonné' ? (
                             <>
                               <UserCheck className="h-3 w-3 mr-1" />
                               Abonné
@@ -334,7 +336,7 @@ const UserManagementFixed = () => {
                           ) : (
                             <>
                               <UserX className="h-3 w-3 mr-1" />
-                              Non abonné
+                              Inactif
                             </>
                           )}
                         </span>
@@ -446,6 +448,20 @@ const UserManagementFixed = () => {
                   >
                     <option value="true">Abonné</option>
                     <option value="false">Non abonné</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Statut de l'abonnement</label>
+                  <select
+                    value={editForm.subscription_status}
+                    onChange={(e) => setEditForm({ ...editForm, subscription_status: e.target.value })}
+                    className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white"
+                  >
+                    <option value="active">Actif</option>
+                    <option value="inactive">Inactif</option>
+                    <option value="cancelled">Annulé</option>
+                    <option value="payment_failed">Paiement échoué</option>
                   </select>
                 </div>
               </div>
