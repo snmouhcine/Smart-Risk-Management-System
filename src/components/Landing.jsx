@@ -260,11 +260,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Everything You Need to
-              <span className="text-purple-600"> Trade Smarter</span>
+              {settings.features_title?.fr || "Everything You Need to"}
+              <span className="text-purple-600"> {settings.features_title_highlight?.fr || "Trade Smarter"}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              Our comprehensive suite of tools gives you the edge you need in today's volatile markets
+              {settings.features_subtitle?.fr || "Our comprehensive suite of tools gives you the edge you need in today's volatile markets"}
             </p>
           </div>
           
@@ -446,11 +446,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Why Traders Choose
-              <span className="text-purple-600"> Smart Risk Manager</span>
+              {settings.benefits_title?.fr || "Why Traders Choose"}
+              <span className="text-purple-600"> {settings.benefits_title_highlight?.fr || "Smart Risk Manager"}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              Join thousands of profitable traders who transformed their results
+              {settings.benefits_subtitle?.fr || "Join thousands of profitable traders who transformed their results"}
             </p>
           </div>
 
@@ -542,11 +542,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Choose Your Path to
-              <span className="text-purple-600"> Profitable Trading</span>
+              {settings.pricing_title?.fr || "Choose Your Path to"}
+              <span className="text-purple-600"> {settings.pricing_title_highlight?.fr || "Profitable Trading"}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              Start with our 14-day free trial. No credit card required.
+              {settings.pricing_subtitle?.fr || "Start with our 14-day free trial. No credit card required."}
             </p>
           </div>
 
@@ -574,7 +574,7 @@ const Landing = () => {
                     {isMiddlePlan && (
                       <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                         <span className="px-4 py-1 bg-gradient-to-r from-purple-600 to-indigo-600 text-white text-sm font-semibold rounded-full">
-                          MOST POPULAR
+                          {settings.pricing_popular_badge?.fr || "MOST POPULAR"}
                         </span>
                       </div>
                     )}
@@ -605,7 +605,7 @@ const Landing = () => {
                           : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                       }`}
                     >
-                      Commencer l'essai gratuit
+                      {settings.pricing_cta_button?.fr || "Commencer l'essai gratuit"}
                     </button>
                   </div>
                 );
@@ -621,7 +621,7 @@ const Landing = () => {
           <div className="text-center mt-12">
             <div className="inline-flex items-center px-6 py-3 bg-green-50 rounded-full">
               <Shield className="w-5 h-5 text-green-600 mr-2" />
-              <span className="text-green-800 font-medium">30-Day Money-Back Guarantee</span>
+              <span className="text-green-800 font-medium">{settings.pricing_guarantee?.fr || "30-Day Money-Back Guarantee"}</span>
             </div>
           </div>
         </div>
@@ -632,11 +632,11 @@ const Landing = () => {
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
-              Trusted by
-              <span className="text-purple-600"> Successful Traders</span>
+              {settings.testimonials_title?.fr || "Trusted by"}
+              <span className="text-purple-600"> {settings.testimonials_title_highlight?.fr || "Successful Traders"}</span>
             </h2>
             <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-              See what our users say about their transformation
+              {settings.testimonials_subtitle?.fr || "See what our users say about their transformation"}
             </p>
           </div>
 
@@ -712,26 +712,26 @@ const Landing = () => {
       <section className="py-20 px-4 bg-gradient-to-r from-purple-600 to-indigo-600">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to Transform Your Trading?
-          </h2>
-          <p className="text-xl text-purple-100 mb-8">
-            Join 5,420+ traders who are already using Smart Risk Manager to protect their capital and maximize profits.
-          </p>
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <button
-              onClick={() => navigate('/auth')}
-              className="group px-8 py-4 bg-white text-purple-600 rounded-xl text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center"
-            >
-              Start Your Free Trial
-              <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
-            </button>
-            <button className="px-8 py-4 bg-purple-700 text-white rounded-xl text-lg font-semibold hover:bg-purple-800 transition-all duration-200">
-              Schedule a Demo
-            </button>
-          </div>
-          <p className="text-purple-200 mt-6 text-sm">
-            No credit card required • 14-day free trial • Cancel anytime
-          </p>
+              {settings.final_cta_title?.fr || "Ready to Transform Your Trading?"}
+            </h2>
+            <p className="text-xl text-purple-100 mb-8">
+              {settings.final_cta_subtitle?.fr || "Join 5,420+ traders who are already using Smart Risk Manager to protect their capital and maximize profits."}
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+              <button
+                onClick={() => navigate('/auth')}
+                className="group px-8 py-4 bg-white text-purple-600 rounded-xl text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center"
+              >
+                {settings.final_cta_button1?.fr || "Start Your Free Trial"}
+                <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+              </button>
+              <button className="px-8 py-4 bg-purple-700 text-white rounded-xl text-lg font-semibold hover:bg-purple-800 transition-all duration-200">
+                {settings.final_cta_button2?.fr || "Schedule a Demo"}
+              </button>
+            </div>
+            <p className="text-purple-200 mt-6 text-sm">
+              {settings.final_cta_subtext?.fr || "No credit card required • 14-day free trial • Cancel anytime"}
+            </p>
         </div>
       </section>
 
