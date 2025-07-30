@@ -11,6 +11,19 @@ export const useSettings = () => {
   return context
 }
 
+// Helper function to parse settings from DB/function response
+const parseSettings = (data) => {
+  return Object.entries(data).reduce((acc, [key, value]) => {
+    try {
+      acc[key] = JSON.parse(value);
+    } catch (e) {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+};
+
+
 export const SettingsProvider = ({ children }) => {
   const [settings, setSettings] = useState({
     site_name: 'Smart Risk Management',
@@ -43,12 +56,10 @@ export const SettingsProvider = ({ children }) => {
   useEffect(() => {
     loadSettings()
     
-    // Update document title when settings change
     if (settings.site_title) {
       document.title = settings.site_title
     }
     
-    // Update favicon when settings change
     if (settings.site_favicon) {
       const link = document.querySelector("link[rel~='icon']") || document.createElement('link')
       link.type = 'image/x-icon'
@@ -57,12 +68,10 @@ export const SettingsProvider = ({ children }) => {
       document.getElementsByTagName('head')[0].appendChild(link)
     }
     
-    // Apply color theme
     if (typeof window !== 'undefined') {
       document.documentElement.style.setProperty('--primary-color', settings.primary_color)
       document.documentElement.style.setProperty('--secondary-color', settings.secondary_color)
       
-      // Apply dark mode
       if (settings.dark_mode) {
         document.documentElement.classList.add('dark')
       } else {
@@ -74,43 +83,37 @@ export const SettingsProvider = ({ children }) => {
   const loadSettings = async () => {
     setLoading(true);
     try {
-      // First, try to use Edge Function
+      // Plan A: Attempt to invoke Edge Function
       const { data: funcData, error: funcError } = await supabase.functions.invoke('site-settings', {
         method: 'GET'
       });
 
-      if (funcError) {
-        console.warn(`Edge function failed: ${funcError.message}. Falling back to DB.`);
-      }
-
       if (funcData && Object.keys(funcData).length > 0) {
-        const settingsObject = Object.entries(funcData).reduce((acc, [key, value]) => {
-            acc[key] = value;
-            return acc;
-        }, {});
-        setSettings(prev => ({ ...prev, ...settingsObject }));
-        setLoading(false);
-        return;
+        const parsedSettings = parseSettings(funcData);
+        setSettings(prev => ({ ...prev, ...parsedSettings }));
+        return; // Success, we are done.
       }
       
-      // Fallback: Direct database query
-      console.warn("Edge function returned no data, using direct DB query.");
+      // Plan B: Fallback to direct database query
+      if(funcError) console.warn(`Edge function failed: ${funcError.message}. Falling back to DB.`);
+
       const { data: dbSettings, error: dbError } = await supabase
         .from('site_settings')
-        .select('*')
+        .select('key, value')
         .in('category', ['landing_page', 'general', 'appearance']);
       
       if (dbError) throw dbError;
 
       if (dbSettings) {
-        const settingsObject = dbSettings.reduce((acc, setting) => {
-          acc[setting.key] = setting.value;
-          return acc;
+        const settingsFromDb = dbSettings.reduce((acc, { key, value }) => {
+            acc[key] = value;
+            return acc;
         }, {});
-        setSettings(prev => ({ ...prev, ...settingsObject }));
+        const parsedSettings = parseSettings(settingsFromDb);
+        setSettings(prev => ({ ...prev, ...parsedSettings }));
       }
     } catch (error) {
-      console.error("Failed to load settings from both Edge Function and DB:", error);
+      console.error("Failed to load settings:", error);
     } finally {
       setLoading(false);
     }
@@ -118,7 +121,6 @@ export const SettingsProvider = ({ children }) => {
 
   const updateSettings = async (updates) => {
     try {
-      // First check if table exists
       const { error: tableError } = await supabase
         .from('site_settings')
         .select('key')
@@ -131,7 +133,6 @@ export const SettingsProvider = ({ children }) => {
         }
       }
       
-      // Try Edge Function first
       try {
         const { data, error } = await supabase.functions.invoke('site-settings', {
           method: 'POST',
@@ -139,15 +140,13 @@ export const SettingsProvider = ({ children }) => {
         })
 
         if (!error) {
-          // Update local state
           setSettings(prev => ({ ...prev, ...updates }))
           return { success: true }
         }
       } catch (funcError) {
-        // Edge Function not available, using direct database update
+        // Fallback
       }
 
-      // Fallback: Use RPC functions which have SECURITY DEFINER
       const promises = Object.entries(updates).map(([key, value]) => {
         return supabase.rpc('update_site_setting', {
           p_key: key,
@@ -159,7 +158,6 @@ export const SettingsProvider = ({ children }) => {
       const errors = results.filter(r => r.error)
       
       if (errors.length > 0) {
-        // If RPC fails, try direct update as last resort
         const directPromises = Object.entries(updates).map(([key, value]) => {
           return supabase
             .from('site_settings')
@@ -181,12 +179,10 @@ export const SettingsProvider = ({ children }) => {
         }
       }
 
-      // Update local state
       setSettings(prev => ({ ...prev, ...updates }))
       
       return { success: true }
     } catch (error) {
-      // Error updating settings
       return { success: false, error: error.message }
     }
   }
