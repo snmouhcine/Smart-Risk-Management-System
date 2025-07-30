@@ -1,4 +1,5 @@
 import { loadStripe } from '@stripe/stripe-js';
+import { supabase } from './supabase';
 
 // Initialize Stripe with your publishable key
 // Replace with your actual Stripe publishable key
@@ -24,24 +25,25 @@ export const STRIPE_CONFIG = {
 // Create checkout session
 export const createCheckoutSession = async (priceId, customerEmail, userId) => {
   try {
-    const response = await fetch('/api/create-checkout-session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+    const { data, error } = await supabase.functions.invoke('create-checkout-session', {
       body: JSON.stringify({
         priceId,
         customerEmail,
         userId,
         successUrl: STRIPE_CONFIG.urls.success,
-        cancelUrl: STRIPE_CONFIG.urls.cancel
+        cancelUrl: STRIPE_CONFIG.urls.cancel,
       }),
     });
 
-    const session = await response.json();
-    return session;
+    if (error) {
+      throw new Error(`Function invocation failed: ${error.message}`);
+    }
+
+    // The invoked function returns { sessionId, url }
+    return data;
   } catch (error) {
     console.error('Error creating checkout session:', error);
+    // On propage l'erreur pour que l'appelant puisse la gérer
     throw error;
   }
 };
