@@ -39,7 +39,7 @@ export const AuthProvider = ({ children }) => {
         try {
           const { data, error } = await supabase
             .from('user_profiles')
-            .select('id, email, full_name, role, is_subscribed, subscription_end_date, is_admin')
+            .select('id, email, full_name, role, is_subscribed, subscription_status, subscription_end_date, is_admin')
             .eq('id', user.id)
             .single()
 
@@ -76,7 +76,7 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .select('id, email, full_name, role, is_subscribed, subscription_end_date, is_admin')
+        .select('id, email, full_name, role, is_subscribed, subscription_status, subscription_end_date, is_admin')
         .eq('id', user.id)
         .single()
 
