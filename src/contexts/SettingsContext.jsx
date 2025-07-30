@@ -72,69 +72,48 @@ export const SettingsProvider = ({ children }) => {
   }, [settings.site_title, settings.site_favicon, settings.primary_color, settings.secondary_color, settings.dark_mode])
 
   const loadSettings = async () => {
+    setLoading(true);
     try {
-      // First, check if the table exists
-      const { data: tableCheck, error: tableError } = await supabase
-        .from('site_settings')
-        .select('key, value')
-        .limit(1)
-      
-      if (tableError && tableError.code === '42P01') {
-        // Settings table does not exist yet. Using defaults.
-        setLoading(false)
-        return
+      // First, try to use Edge Function
+      const { data: funcData, error: funcError } = await supabase.functions.invoke('site-settings', {
+        method: 'GET'
+      });
+
+      if (funcError) {
+        console.warn(`Edge function failed: ${funcError.message}. Falling back to DB.`);
+      }
+
+      if (funcData && Object.keys(funcData).length > 0) {
+        const settingsObject = Object.entries(funcData).reduce((acc, [key, value]) => {
+            acc[key] = value;
+            return acc;
+        }, {});
+        setSettings(prev => ({ ...prev, ...settingsObject }));
+        setLoading(false);
+        return;
       }
       
-      // Try to use Edge Function first
-      try {
-        const { data, error } = await supabase.functions.invoke('site-settings', {
-          method: 'GET'
-        })
-
-        if (data && Object.keys(data).length > 0) {
-          // Parse JSON values if they are strings
-          const parsedSettings = Object.entries(data).reduce((acc, [key, value]) => {
-            // The edge function already returns objects, but we keep this for the direct DB fallback
-            if (typeof value === 'string') {
-              try {
-                acc[key] = JSON.parse(value);
-              } catch {
-                acc[key] = value;
-              }
-            } else {
-              acc[key] = value;
-            }
-            return acc;
-          }, {});
-          setSettings(prev => ({ ...prev, ...parsedSettings }));
-          setLoading(false);
-          return; // IMPORTANT: Only return if function call was successful
-        }
-        // If there was an error or no data, we will fall through to the direct DB query.
-        console.warn('Could not fetch settings from Edge Function, falling back to direct query.');
-      
-      // Fallback: Try direct database query
+      // Fallback: Direct database query
+      console.warn("Edge function returned no data, using direct DB query.");
       const { data: dbSettings, error: dbError } = await supabase
         .from('site_settings')
-        .select('*')
+        .select('*');
       
-      if (!dbError && dbSettings) {
+      if (dbError) throw dbError;
+
+      if (dbSettings) {
         const settingsObject = dbSettings.reduce((acc, setting) => {
-          try {
-            acc[setting.key] = JSON.parse(setting.value)
-          } catch {
-            acc[setting.key] = setting.value
-          }
-          return acc
-        }, {})
-        setSettings(prev => ({ ...prev, ...settingsObject }))
+          acc[setting.key] = setting.value;
+          return acc;
+        }, {});
+        setSettings(prev => ({ ...prev, ...settingsObject }));
       }
     } catch (error) {
-      // Error in loadSettings
+      console.error("Failed to load settings from both Edge Function and DB:", error);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const updateSettings = async (updates) => {
     try {
