@@ -97,7 +97,8 @@ export const SettingsProvider = ({ children }) => {
       console.warn("Edge function returned no data, using direct DB query.");
       const { data: dbSettings, error: dbError } = await supabase
         .from('site_settings')
-        .select('*');
+        .select('*')
+        .in('category', ['landing_page', 'general', 'appearance']);
       
       if (dbError) throw dbError;
 
