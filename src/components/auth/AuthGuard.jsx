@@ -7,8 +7,11 @@ import { supabase } from '../../lib/supabase'
 const AuthGuard = ({ children }) => {
   const { user, loading, profile, profileLoading } = useAuth()
   
+  console.log('[AuthGuard] State:', { loading, profileLoading, user: !!user, profile: !!profile })
+  
   // Affichage de chargement pendant la vérification d'authentification
   if (loading || profileLoading) {
+    console.log('[AuthGuard] Showing loading screen...')
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
         <div className="text-center">
@@ -22,12 +25,21 @@ const AuthGuard = ({ children }) => {
 
   // Si l'utilisateur n'est pas connecté, rediriger vers la page d'auth
   if (!user) {
+    console.log('[AuthGuard] No user, redirecting to /auth')
     return <Navigate to="/auth" replace />
   }
 
   // Check subscription status (exempt admin users)
   // If profile is null or user is not subscribed (and not admin), show payment required
+  console.log('[AuthGuard] User is authenticated, checking profile/subscription...')
   if (!profile || (!profile.is_subscribed && profile.role !== 'admin')) {
+    
+    // Pour le débogage :
+    if (!profile) {
+      console.warn('[AuthGuard] Profile is null. This might indicate an issue with profile fetching.')
+    } else {
+      console.log(`[AuthGuard] Subscription check: is_subscribed=${profile.is_subscribed}, role=${profile.role}`)
+    }
     // Special case: if profile is null and it's still loading, wait
     if (!profile && profileLoading) {
       return (

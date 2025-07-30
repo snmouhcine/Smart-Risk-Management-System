@@ -32,40 +32,11 @@ function App() {
 }
 
 function AppContent() {
-  const { settings, loading } = useSettings()
-  const { user } = useAuth()
-  const [isAdmin, setIsAdmin] = React.useState(false)
-  const [profileLoading, setProfileLoading] = React.useState(true)
+  const { settings, loading: settingsLoading } = useSettings()
+  const { isAdmin, profileLoading } = useAuth()
   
-  React.useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (!user?.id) {
-        setIsAdmin(false)
-        setProfileLoading(false)
-        return
-      }
-      
-      try {
-        const { data } = await supabase
-          .from('user_profiles')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-        
-        setIsAdmin(data?.is_admin || false)
-      } catch (error) {
-        // Error checking admin status
-        setIsAdmin(false)
-      } finally {
-        setProfileLoading(false)
-      }
-    }
-    
-    checkAdminStatus()
-  }, [user?.id])
-  
-  // Show loading while settings are being fetched
-  if (loading || profileLoading) {
+  // Affiche un chargeur tant que les paramètres ou le profil sont en cours de chargement
+  if (settingsLoading || profileLoading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
@@ -73,7 +44,7 @@ function AppContent() {
     )
   }
   
-  // Check maintenance mode (admins can bypass)
+  // Vérifie le mode maintenance (les administrateurs peuvent contourner)
   if (settings.maintenance_mode && !isAdmin) {
     return <MaintenanceMode siteName={settings.site_name} />
   }

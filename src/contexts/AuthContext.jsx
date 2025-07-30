@@ -15,42 +15,15 @@ export const AuthProvider = ({ children }) => {
   const [session, setSession] = useState(null)
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true) // Commence en chargement
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // onAuthStateChange gère la session initiale et tous les changements.
-    // Le premier événement reçu est 'INITIAL_SESSION'.
+    setLoading(true)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
+        console.log(`[AuthContext] onAuthStateChange event: ${event}`)
         setSession(session)
-        const currentUser = session?.user
-        setUser(currentUser ?? null)
-
-        if (currentUser) {
-          try {
-            const { data, error } = await supabase
-              .from('user_profiles')
-              .select('id, email, full_name, role, is_subscribed, subscription_end_date')
-              .eq('id', currentUser.id)
-              .single()
-
-            if (error) {
-              console.error("AuthContext: Error fetching profile:", error)
-              setProfile(null)
-            } else {
-              setProfile(data)
-            }
-          } catch (e) {
-            console.error("AuthContext: Critical error fetching profile:", e)
-            setProfile(null)
-          }
-        } else {
-          setProfile(null)
-        }
-        
-        // Le premier événement (INITIAL_SESSION) désactivera le chargement initial.
-        // Les événements suivants (TOKEN_REFRESHED) mettront à jour les données silencieusement.
-        setLoading(false)
+        setUser(session?.user ?? null)
       }
     )
 
@@ -58,29 +31,66 @@ export const AuthProvider = ({ children }) => {
       subscription.unsubscribe()
     }
   }, [])
-  
-  const refreshProfile = useCallback(async () => {
-    if (user) {
-      setLoading(true)
-      try {
-        const { data, error } = await supabase
-          .from('user_profiles')
-          .select('id, email, full_name, role, is_subscribed, subscription_end_date')
-          .eq('id', user.id)
-          .single()
 
-        if (error) {
-          console.error("AuthContext: Error refreshing profile:", error)
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (user) {
+        console.log(`[AuthContext] useEffect[user] - Fetching profile for user: ${user.id}`)
+        try {
+          const { data, error } = await supabase
+            .from('user_profiles')
+            .select('id, email, full_name, role, is_subscribed, subscription_end_date, is_admin')
+            .eq('id', user.id)
+            .single()
+
+          if (error) {
+            console.error('[AuthContext] Error fetching profile:', error)
+            setProfile(null)
+          } else {
+            console.log('[AuthContext] Profile fetched:', data)
+            setProfile(data)
+          }
+        } catch (e) {
+          console.error('[AuthContext] Critical error fetching profile:', e)
           setProfile(null)
-        } else {
-          setProfile(data)
+        } finally {
+          console.log('[AuthContext] Profile fetch finished. Setting loading to false.')
+          setLoading(false)
         }
-      } catch (e) {
-        console.error("AuthContext: Critical error on refresh:", e)
-        setProfile(null)
-      } finally {
+      } else {
+        console.log('[AuthContext] No user session. Setting loading to false.')
         setLoading(false)
+        setProfile(null)
       }
+    }
+
+    fetchProfile()
+  }, [user])
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) {
+      console.log('No user to refresh profile for.')
+      return
+    }
+    setLoading(true)
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('id, email, full_name, role, is_subscribed, subscription_end_date, is_admin')
+        .eq('id', user.id)
+        .single()
+
+      if (error) {
+        console.error("AuthContext: Error refreshing profile:", error)
+        setProfile(null)
+      } else {
+        setProfile(data)
+      }
+    } catch (e) {
+      console.error("AuthContext: Critical error on refresh:", e)
+      setProfile(null)
+    } finally {
+      setLoading(false)
     }
   }, [user])
 
@@ -108,8 +118,8 @@ export const AuthProvider = ({ children }) => {
     resetPassword,
     refreshProfile,
     isAuthenticated: !!user,
-    profileLoading: loading, // `profileLoading` est maintenant un alias de `loading`
-    isAdmin: profile?.role === 'admin'
+    profileLoading: loading, 
+    isAdmin: profile?.is_admin || false
   }
 
   return (
