@@ -91,23 +91,27 @@ export const SettingsProvider = ({ children }) => {
           method: 'GET'
         })
 
-        if (!error && data) {
-          // Parse JSON values
+        if (data && Object.keys(data).length > 0) {
+          // Parse JSON values if they are strings
           const parsedSettings = Object.entries(data).reduce((acc, [key, value]) => {
-            try {
-              acc[key] = JSON.parse(value)
-            } catch {
-              acc[key] = value
+            // The edge function already returns objects, but we keep this for the direct DB fallback
+            if (typeof value === 'string') {
+              try {
+                acc[key] = JSON.parse(value);
+              } catch {
+                acc[key] = value;
+              }
+            } else {
+              acc[key] = value;
             }
-            return acc
-          }, {})
-          setSettings(prev => ({ ...prev, ...parsedSettings }))
-          setLoading(false)
-          return
+            return acc;
+          }, {});
+          setSettings(prev => ({ ...prev, ...parsedSettings }));
+          setLoading(false);
+          return; // IMPORTANT: Only return if function call was successful
         }
-      } catch (funcError) {
-        // Edge Function not available, falling back to direct database query
-      }
+        // If there was an error or no data, we will fall through to the direct DB query.
+        console.warn('Could not fetch settings from Edge Function, falling back to direct query.');
       
       // Fallback: Try direct database query
       const { data: dbSettings, error: dbError } = await supabase
