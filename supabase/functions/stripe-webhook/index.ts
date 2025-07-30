@@ -35,7 +35,7 @@ serve(async (req) => {
           await supabase
             .from('user_profiles')
             .update({
-              is_subscribed: subscription.status === 'active',
+              is_subscribed: subscription.status === 'active' || subscription.status === 'trialing',
               stripe_customer_id: subscription.customer as string,
               stripe_subscription_id: subscription.id,
               subscription_status: subscription.status,
@@ -80,7 +80,7 @@ serve(async (req) => {
               is_subscribed: true,
               stripe_customer_id: session.customer as string,
               stripe_subscription_id: subscription.id,
-              subscription_status: subscription.status,
+              subscription_status: 'active', // Forcer le statut à 'active' après un paiement réussi
               subscription_end_date: new Date(subscription.current_period_end * 1000).toISOString()
             })
             .eq('id', userId)
