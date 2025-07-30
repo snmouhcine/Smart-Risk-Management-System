@@ -174,20 +174,19 @@ const Landing = () => {
             {/* Badge */}
             <div className="inline-flex items-center px-4 py-2 bg-purple-100 text-purple-700 rounded-full text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4 mr-2" />
-              Trusted by 5,420+ Professional Traders
+              {settings.hero_badge?.fr || 'Trusted by 5,420+ Professional Traders'}
             </div>
             
             {/* Main headline */}
             <h1 className="text-5xl md:text-7xl font-bold text-slate-900 mb-6 leading-tight">
-              Transform Your Trading with
+              {settings.hero_title?.fr || 'Transform Your Trading with'}
               <span className="block bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Intelligent Risk Management
+                {settings.hero_title_highlight?.fr || 'Intelligent Risk Management'}
               </span>
             </h1>
             
             <p className="text-xl md:text-2xl text-slate-600 max-w-3xl mx-auto mb-8">
-              Stop losing money to poor risk management. Our AI-powered platform helps you make smarter trades, 
-              protect your capital, and achieve consistent profitability.
+              {settings.hero_subtitle?.fr || 'Stop losing money to poor risk management. Our AI-powered platform helps you make smarter trades, protect your capital, and achieve consistent profitability.'}
             </p>
             
             {/* CTA Buttons */}
@@ -196,14 +195,14 @@ const Landing = () => {
                 onClick={() => navigate('/auth')}
                 className="group px-8 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl text-lg font-semibold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center"
               >
-                Start 14-Day Free Trial
+                {settings.hero_cta_main?.fr || 'Start 14-Day Free Trial'}
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </button>
               <button
                 className="px-8 py-4 bg-white text-purple-600 rounded-xl text-lg font-semibold border-2 border-purple-200 hover:border-purple-300 hover:shadow-lg transition-all duration-200 flex items-center"
               >
                 <Play className="w-5 h-5 mr-2" />
-                Watch Demo
+                {settings.hero_cta_secondary?.fr || 'Watch Demo'}
               </button>
             </div>
             
@@ -211,15 +210,15 @@ const Landing = () => {
             <div className="mt-8 flex items-center justify-center space-x-8 text-sm text-slate-500">
               <div className="flex items-center">
                 <CheckCircle className="w-5 h-5 text-green-500 mr-1" />
-                No credit card required
+                {settings.hero_trust_1?.fr || 'No credit card required'}
               </div>
               <div className="flex items-center">
                 <Shield className="w-5 h-5 text-blue-500 mr-1" />
-                Bank-level security
+                {settings.hero_trust_2?.fr || 'Bank-level security'}
               </div>
               <div className="flex items-center">
                 <Clock className="w-5 h-5 text-purple-500 mr-1" />
-                Setup in 2 minutes
+                {settings.hero_trust_3?.fr || 'Setup in 2 minutes'}
               </div>
             </div>
           </div>
