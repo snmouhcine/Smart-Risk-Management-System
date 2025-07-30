@@ -14,6 +14,7 @@ import AdminAnalytics from './components/admin/AdminAnalytics'
 import AdminPayments from './components/admin/AdminPayments'
 import AdminSubscriptions from './components/admin/AdminSubscriptions'
 import AdminSettings from './components/admin/AdminSettings'
+import AdminContentManagement from './components/admin/AdminContentManagement'
 import PaymentSuccessAutomatic from './components/PaymentSuccessAutomatic'
 import PaymentCancelled from './components/PaymentCancelled'
 import MaintenanceMode from './components/MaintenanceMode'
@@ -105,6 +106,14 @@ function AppContent() {
             element={
               <AdminGuard>
                 <AdminSubscriptions />
+              </AdminGuard>
+            } 
+          />
+          <Route 
+            path="/admin/content" 
+            element={
+              <AdminGuard>
+                <AdminContentManagement />
               </AdminGuard>
             } 
           />

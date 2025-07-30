@@ -20,7 +20,8 @@ import {
   LogOut,
   User,
   Mail,
-  Calendar
+  Calendar,
+  BookText
 } from 'lucide-react'
 
 const AdminLayout = ({ children }) => {
@@ -68,6 +69,12 @@ const AdminLayout = ({ children }) => {
       icon: Package,
       path: '/admin/subscriptions',
       color: 'text-pink-400'
+    },
+    {
+      title: 'Gestion du contenu',
+      icon: BookText,
+      path: '/admin/content',
+      color: 'text-orange-400'
     },
     {
       title: 'Paramètres',
