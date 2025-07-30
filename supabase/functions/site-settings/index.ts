@@ -93,30 +93,79 @@ serve(async (req) => {
 
 function getCategoryForKey(key: string): string {
   const categoryMap: Record<string, string> = {
+    // General settings
     site_name: 'general',
     site_title: 'general',
     site_url: 'general',
     site_favicon: 'general',
+    
+    // Email settings
     contact_email: 'email',
     support_email: 'email',
-    maintenance_mode: 'general',
-    allow_registrations: 'security',
-    require_email_verification: 'security',
-    auto_backup: 'database',
-    backup_frequency: 'database',
-    email_notifications: 'notifications',
-    payment_notifications: 'notifications',
-    error_notifications: 'notifications',
-    primary_color: 'appearance',
-    secondary_color: 'appearance',
-    dark_mode: 'appearance',
-    stripe_webhook_secret: 'payment',
     smtp_host: 'email',
     smtp_port: 'email',
     smtp_user: 'email',
     smtp_password: 'email',
     email_from_name: 'email',
-    email_from_address: 'email'
+    email_from_address: 'email',
+    
+    // Security settings
+    maintenance_mode: 'general',
+    allow_registrations: 'security',
+    require_email_verification: 'security',
+    
+    // Database settings
+    auto_backup: 'database',
+    backup_frequency: 'database',
+    
+    // Notification settings
+    email_notifications: 'notifications',
+    payment_notifications: 'notifications',
+    error_notifications: 'notifications',
+    
+    // Appearance settings
+    primary_color: 'appearance',
+    secondary_color: 'appearance',
+    dark_mode: 'appearance',
+    
+    // Payment settings
+    stripe_webhook_secret: 'payment',
+    
+    // Landing page content
+    hero_badge: 'landing_page',
+    hero_title: 'landing_page',
+    hero_title_highlight: 'landing_page',
+    hero_subtitle: 'landing_page',
+    hero_cta_main: 'landing_page',
+    hero_cta_secondary: 'landing_page',
+    hero_trust_1: 'landing_page',
+    hero_trust_2: 'landing_page',
+    hero_trust_3: 'landing_page',
+    
+    features_title: 'landing_page',
+    features_title_highlight: 'landing_page',
+    features_subtitle: 'landing_page',
+    
+    benefits_title: 'landing_page',
+    benefits_title_highlight: 'landing_page',
+    benefits_subtitle: 'landing_page',
+    
+    pricing_title: 'landing_page',
+    pricing_title_highlight: 'landing_page',
+    pricing_subtitle: 'landing_page',
+    pricing_popular_badge: 'landing_page',
+    pricing_cta_button: 'landing_page',
+    pricing_guarantee: 'landing_page',
+    
+    testimonials_title: 'landing_page',
+    testimonials_title_highlight: 'landing_page',
+    testimonials_subtitle: 'landing_page',
+    
+    final_cta_title: 'landing_page',
+    final_cta_subtitle: 'landing_page',
+    final_cta_button1: 'landing_page',
+    final_cta_button2: 'landing_page',
+    final_cta_subtext: 'landing_page'
   }
   
   return categoryMap[key] || 'general'
