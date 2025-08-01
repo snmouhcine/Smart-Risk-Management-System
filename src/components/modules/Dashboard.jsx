@@ -478,36 +478,163 @@ const Dashboard = ({
         
         {/* Afficher l'état du mois */}
         {monthData && (
-          <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-slate-600">Performance {isViewingHistory ? 'du mois' : 'en cours'}</p>
-                <p className={`text-xl font-bold ${monthData.monthlyPnLPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {monthData.monthlyPnLPercent >= 0 ? '+' : ''}{monthData.monthlyPnLPercent.toFixed(2)}%
-                </p>
-                <p className="text-xs text-slate-500 mt-1">
-                  P&L: {monthData.monthlyPnL >= 0 ? '+' : ''}${monthData.monthlyPnL.toFixed(2)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm text-slate-600">Objectif {monthlyTarget}%</p>
-                <p className="flex items-center space-x-1">
+          <div className={`mt-6 relative overflow-hidden rounded-2xl shadow-2xl ${
+            monthlyTargetInfo.isAchieved 
+              ? 'bg-gradient-to-br from-emerald-500 via-green-500 to-teal-600' 
+              : monthData.monthlyPnLPercent >= 0 
+                ? 'bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600'
+                : 'bg-gradient-to-br from-red-500 via-rose-500 to-pink-600'
+          }`}>
+            {/* Effet de brillance animé */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12 animate-pulse"></div>
+            
+            {/* Motif de fond */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute inset-0" style={{
+                backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.1) 10px, rgba(255,255,255,.1) 20px)`
+              }}></div>
+            </div>
+
+            <div className="relative p-4">
+              {/* En-tête avec titre et statut */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    monthlyTargetInfo.isAchieved 
+                      ? 'bg-white/20 backdrop-blur-lg' 
+                      : 'bg-black/20 backdrop-blur-lg'
+                  }`}>
+                    <TrendingUp className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-white font-bold text-base">
+                      Performance {isViewingHistory ? 'du Mois' : 'Mensuelle'}
+                    </h3>
+                    <p className="text-white/80 text-xs">
+                      {selectedDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Badge de statut */}
+                <div className={`px-3 py-1.5 rounded-full backdrop-blur-lg flex items-center space-x-1.5 ${
+                  monthlyTargetInfo.isAchieved 
+                    ? 'bg-gradient-to-r from-green-500/30 to-emerald-500/30 border border-green-400/50' 
+                    : isViewingHistory
+                      ? 'bg-gradient-to-r from-red-500/30 to-rose-500/30 border border-red-400/50'
+                      : 'bg-gradient-to-r from-blue-500/30 to-indigo-500/30 border border-blue-400/50'
+                }`}>
                   {monthlyTargetInfo.isAchieved ? (
                     <>
-                      <CheckCircle className="w-5 h-5 text-green-500" />
-                      <span className="text-sm font-medium text-green-600">Atteint</span>
+                      <Trophy className="w-4 h-4 text-yellow-300" />
+                      <span className="text-white font-bold text-sm">OBJECTIF ATTEINT!</span>
+                    </>
+                  ) : isViewingHistory ? (
+                    <>
+                      <XCircle className="w-4 h-4 text-red-300" />
+                      <span className="text-white font-medium text-sm">Objectif non atteint</span>
                     </>
                   ) : (
                     <>
-                      <XCircle className="w-5 h-5 text-red-500" />
-                      <span className="text-sm font-medium text-red-600">Non atteint</span>
+                      <Target className="w-4 h-4 text-blue-300" />
+                      <span className="text-white font-medium text-sm">En progression</span>
                     </>
                   )}
-                </p>
-                {monthData.isFromSnapshot && (
-                  <p className="text-xs text-slate-400 mt-1">Données archivées</p>
-                )}
+                </div>
               </div>
+
+              {/* Section principale avec les métriques */}
+              <div className="grid grid-cols-2 gap-4">
+                {/* Performance */}
+                <div className="space-y-2">
+                  <div className="flex items-baseline space-x-1">
+                    <span className="text-3xl font-black text-white">
+                      {monthData.monthlyPnLPercent >= 0 ? '+' : ''}{monthData.monthlyPnLPercent.toFixed(2)}
+                    </span>
+                    <span className="text-lg font-bold text-white/80">%</span>
+                  </div>
+                  
+                  <div className="space-y-0.5">
+                    <p className="text-white/60 text-xs font-medium">Profit & Loss</p>
+                    <p className="text-xl font-bold text-white">
+                      {monthData.monthlyPnL >= 0 ? '+' : ''}${Math.abs(monthData.monthlyPnL).toFixed(2)}
+                    </p>
+                  </div>
+
+                  {/* Barre de progression */}
+                  <div className="mt-3">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-white/60 text-xs">Progression</span>
+                      <span className="text-white font-bold text-xs">
+                        {Math.min(100, Math.abs((monthData.monthlyPnLPercent / monthlyTarget) * 100)).toFixed(0)}%
+                      </span>
+                    </div>
+                    <div className="h-2 bg-black/30 rounded-full overflow-hidden backdrop-blur">
+                      <div 
+                        className="h-full bg-gradient-to-r from-white/80 to-white rounded-full transition-all duration-1000 ease-out"
+                        style={{ 
+                          width: `${Math.min(100, Math.abs((monthData.monthlyPnLPercent / monthlyTarget) * 100))}%` 
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Objectif */}
+                <div className="space-y-2">
+                  <div className="bg-black/20 backdrop-blur-lg rounded-lg p-3 border border-white/20">
+                    <p className="text-white/60 text-xs mb-1">Objectif Mensuel</p>
+                    <div className="flex items-baseline space-x-1 mb-2">
+                      <span className="text-2xl font-bold text-white">{monthlyTarget}</span>
+                      <span className="text-lg text-white/80">%</span>
+                    </div>
+                    
+                    {monthlyTargetInfo.isAchieved ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center space-x-1.5">
+                          <CheckCircle className="w-5 h-5 text-green-300" />
+                          <span className="text-green-300 font-bold text-sm">Félicitations!</span>
+                        </div>
+                        <div>
+                          <p className="text-white/80 text-xs">Dépassement</p>
+                          <p className="text-lg font-bold text-green-300">
+                            +${Math.abs(monthData.monthlyPnL - (monthData.monthStartCapital * monthlyTarget / 100)).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex-1">
+                        <p className="text-white/80 text-xs">Restant à réaliser</p>
+                        <p className="text-lg font-bold text-white">
+                          ${Math.abs(monthlyTargetInfo.remainingAmount || 0).toFixed(2)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Statistiques rapides */}
+                  <div className="grid grid-cols-2 gap-1.5 mt-2">
+                    <div className="bg-white/10 backdrop-blur rounded-lg p-2 text-center">
+                      <p className="text-white/60 text-xs">Capital Début</p>
+                      <p className="text-white font-bold text-base">${monthData.monthStartCapital.toFixed(0)}</p>
+                    </div>
+                    <div className="bg-white/10 backdrop-blur rounded-lg p-2 text-center">
+                      <p className="text-white/60 text-xs">Capital Fin</p>
+                      <p className="text-white font-bold text-base">${monthData.actualBalance.toFixed(0)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer avec informations supplémentaires */}
+              {monthData.isFromSnapshot && (
+                <div className="mt-3 pt-3 border-t border-white/20">
+                  <p className="text-white/60 text-xs flex items-center">
+                    <Activity className="w-3 h-3 mr-1.5" />
+                    Données archivées du mois
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
