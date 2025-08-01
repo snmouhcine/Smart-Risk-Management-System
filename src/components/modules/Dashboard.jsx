@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   DollarSign, TrendingUp, Target, Shield, AlertTriangle, 
   Brain, Calculator, Lock, Skull, Flame, AlertCircle,
   LineChart, Cpu, Activity, Trophy, Star, Zap, Award,
-  TrendingDown, Calendar, CheckCircle, XCircle, Medal
+  TrendingDown, Calendar, CheckCircle, XCircle, Medal,
+  ChevronLeft, ChevronRight, RotateCcw
 } from 'lucide-react';
 import { formatCurrency, formatPercentage, calculateMonthlyTargetAmount, calculateWeeklyTargetAmount } from '../../utils/formatters';
 
@@ -19,31 +20,170 @@ const Dashboard = ({
   handleQuickAction,
   isAnalyzing,
   secureMode,
-  getStatusStyles
+  getStatusStyles,
+  monthlySnapshots = [],
+  currentMonthSnapshot,
+  userSettings
 }) => {
-  // Calculs des objectifs
-  const calculatedBalance = calculateCurrentBalanceFromJournal();
-  const actualBalance = calculatedBalance || parseFloat(currentBalance) || 0;
-  const monthlyTargetInfo = calculateMonthlyTargetAmount(actualBalance, initialCapital, monthlyTarget);
-  const weeklyTargetInfo = calculateWeeklyTargetAmount(tradingJournal, actualBalance, weeklyTarget);
+  // État pour la navigation entre mois
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [isViewingHistory, setIsViewingHistory] = useState(false);
+  const [viewedSnapshot, setViewedSnapshot] = useState(null);
+  
+  // Noms des mois en français
+  const monthNames = [
+    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
+  ];
+  
+  // Naviguer entre les mois
+  const navigateMonth = (direction) => {
+    const newDate = new Date(selectedDate);
+    newDate.setMonth(newDate.getMonth() + direction);
+    setSelectedDate(newDate);
+    
+    // Vérifier si on regarde un mois passé
+    const now = new Date();
+    const isCurrentMonth = newDate.getMonth() === now.getMonth() && 
+                          newDate.getFullYear() === now.getFullYear();
+    
+    setIsViewingHistory(!isCurrentMonth);
+    
+    if (!isCurrentMonth) {
+      // Chercher le snapshot du mois sélectionné
+      const snapshot = monthlySnapshots.find(s => 
+        s.year === newDate.getFullYear() && 
+        s.month === newDate.getMonth() + 1
+      );
+      setViewedSnapshot(snapshot);
+    } else {
+      setViewedSnapshot(null);
+    }
+  };
+  
+  // Retour au mois actuel
+  const goToCurrentMonth = () => {
+    setSelectedDate(new Date());
+    setIsViewingHistory(false);
+    setViewedSnapshot(null);
+  };
+  // Calculs des objectifs en fonction du mois sélectionné
+  const getMonthData = () => {
+    // D'abord vérifier si on a un snapshot pour le mois
+    if (isViewingHistory && viewedSnapshot) {
+      return {
+        actualBalance: viewedSnapshot.month_end_capital,
+        monthStartCapital: viewedSnapshot.month_start_capital,
+        monthlyPnL: viewedSnapshot.total_pnl,
+        monthlyPnLPercent: viewedSnapshot.pnl_percentage,
+        isFromSnapshot: true
+      };
+    }
+    
+    // Sinon calculer depuis le journal de trading
+    const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    
+    // Filtrer les entrées du journal pour le mois sélectionné
+    const monthEntries = Object.entries(tradingJournal || {})
+      .filter(([date]) => {
+        const d = new Date(date);
+        return d >= monthStart && d <= monthEnd;
+      })
+      .sort(([a], [b]) => new Date(a) - new Date(b));
+    
+    // Calculer le P&L du mois
+    const monthlyPnL = monthEntries.reduce((sum, [_, entry]) => {
+      return sum + (parseFloat(entry.pnl) || 0);
+    }, 0);
+    
+    // Pour le capital de début de mois, il faut calculer le capital jusqu'au début du mois
+    let monthStartCapital = parseFloat(initialCapital) || 0;
+    
+    // Ajouter tous les P&L avant le mois sélectionné
+    Object.entries(tradingJournal || {}).forEach(([date, entry]) => {
+      const d = new Date(date);
+      if (d < monthStart) {
+        monthStartCapital += parseFloat(entry.pnl) || 0;
+      }
+    });
+    
+    const actualBalance = monthStartCapital + monthlyPnL;
+    const monthlyPnLPercent = monthStartCapital > 0 ? (monthlyPnL / monthStartCapital) * 100 : 0;
+    
+    // Pour le mois en cours, utiliser les valeurs des settings si disponibles
+    const now = new Date();
+    const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
+                          selectedDate.getFullYear() === now.getFullYear();
+    
+    if (isCurrentMonth && userSettings?.month_start_capital) {
+      // Pour le mois en cours, utiliser le capital de début de mois depuis les settings
+      return {
+        actualBalance: calculateCurrentBalanceFromJournal() || parseFloat(currentBalance) || 0,
+        monthStartCapital: userSettings.month_start_capital,
+        monthlyPnL: (calculateCurrentBalanceFromJournal() || parseFloat(currentBalance) || 0) - userSettings.month_start_capital,
+        monthlyPnLPercent: userSettings.month_start_capital > 0 ? 
+          (((calculateCurrentBalanceFromJournal() || parseFloat(currentBalance) || 0) - userSettings.month_start_capital) / userSettings.month_start_capital) * 100 : 0,
+        isFromSnapshot: false
+      };
+    }
+    
+    return {
+      actualBalance,
+      monthStartCapital,
+      monthlyPnL,
+      monthlyPnLPercent,
+      isFromSnapshot: false
+    };
+  };
+  
+  const monthData = getMonthData();
+  const monthlyTargetInfo = calculateMonthlyTargetAmount(monthData.actualBalance, monthData.monthStartCapital, monthlyTarget);
+  const weeklyTargetInfo = calculateWeeklyTargetAmount(tradingJournal, monthData.actualBalance, weeklyTarget);
 
   // Calculs pour la gamification
   const calculateGamificationData = () => {
-    // Calcul des statistiques de base
-    const totalTrades = Object.values(tradingJournal || {}).filter(day => day.hasTraded).length;
-    const profitableDays = Object.values(tradingJournal || {}).filter(day => day.hasTraded && parseFloat(day.pnl) > 0).length;
+    // Si on regarde un snapshot historique, utiliser ses données
+    if (isViewingHistory && viewedSnapshot) {
+      return {
+        level: 0, // Pas de système de niveau pour les mois passés
+        levelInfo: { title: "HISTORIQUE", color: "from-gray-500 to-gray-600" },
+        totalXP: 0,
+        currentLevelXP: 0,
+        xpToNextLevel: 0,
+        badges: [],
+        currentProfitStreak: 0,
+        winRate: viewedSnapshot.win_rate || 0,
+        totalTrades: viewedSnapshot.total_trades || 0,
+        dailyChallenges: []
+      };
+    }
+    
+    // Calcul des statistiques de base pour le mois en cours
+    const monthStart = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const monthEnd = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    
+    const monthJournal = Object.entries(tradingJournal || {})
+      .filter(([date]) => {
+        const d = new Date(date);
+        return d >= monthStart && d <= monthEnd;
+      })
+      .reduce((acc, [date, data]) => ({ ...acc, [date]: data }), {});
+    
+    const totalTrades = Object.values(monthJournal).filter(day => day.hasTraded).length;
+    const profitableDays = Object.values(monthJournal).filter(day => day.hasTraded && parseFloat(day.pnl) > 0).length;
     const winRate = totalTrades > 0 ? (profitableDays / totalTrades) * 100 : 0;
     
-    // Calcul des séries (streaks)
+    // Calcul des séries (streaks) pour le mois sélectionné
     let currentProfitStreak = 0;
     let currentDisciplineStreak = 0;
     let longestProfitStreak = 0;
     
-    const sortedDays = Object.entries(tradingJournal || {})
+    const sortedMonthDays = Object.entries(monthJournal || {})
       .sort(([a], [b]) => new Date(b) - new Date(a));
     
-    // Calcul de la série de jours profitables
-    for (const [date, day] of sortedDays) {
+    // Calcul de la série de jours profitables dans le mois
+    for (const [date, day] of sortedMonthDays) {
       if (day.hasTraded && parseFloat(day.pnl) > 0) {
         currentProfitStreak++;
         longestProfitStreak = Math.max(longestProfitStreak, currentProfitStreak);
@@ -52,19 +192,35 @@ const Dashboard = ({
       }
     }
 
-    // Calcul du niveau et XP
-    const calculateXP = () => {
+    // Calcul du niveau et XP - Système hybride
+    // XP mensuel pour le mois en cours
+    const calculateMonthXP = () => {
       let xp = 0;
       xp += totalTrades * 10; // 10 XP par trade
       xp += profitableDays * 25; // 25 XP par jour profitable
       xp += monthlyTargetInfo.isAchieved ? 500 : 0; // 500 XP pour objectif mensuel
-      xp += weeklyTargetInfo.isAchieved ? 200 : 0; // 200 XP pour objectif hebdo
       xp += currentProfitStreak * 50; // 50 XP par jour de série
       return xp;
     };
-
-    const totalXP = calculateXP();
-    const level = Math.floor(totalXP / 1000) + 1;
+    
+    const monthXP = calculateMonthXP();
+    
+    // Pour le niveau global, on garde le système cumulatif uniquement pour le mois en cours
+    const now = new Date();
+    const isCurrentMonth = selectedDate.getMonth() === now.getMonth() && 
+                          selectedDate.getFullYear() === now.getFullYear();
+    
+    // Calculer l'XP total global (tous les mois)
+    let globalXP = 0;
+    if (isCurrentMonth) {
+      // Pour le mois en cours, calculer depuis tous les trades
+      const allTrades = Object.values(tradingJournal || {}).filter(day => day.hasTraded).length;
+      const allProfitableDays = Object.values(tradingJournal || {}).filter(day => day.hasTraded && parseFloat(day.pnl) > 0).length;
+      globalXP = allTrades * 10 + allProfitableDays * 25;
+    }
+    
+    const totalXP = isCurrentMonth ? globalXP : monthXP;
+    const level = isCurrentMonth ? Math.floor(totalXP / 1000) + 1 : 0;
     const currentLevelXP = totalXP % 1000;
     const xpToNextLevel = 1000 - currentLevelXP;
 
@@ -82,33 +238,46 @@ const Dashboard = ({
     // Calcul des badges
     const badges = [];
     
-    // Badge première semaine profitable
+    // Badge première semaine profitable du mois
     const weeklyPnLs = [];
-    for (let i = 0; i < 4; i++) {
-      const weekStart = new Date();
-      weekStart.setDate(weekStart.getDate() - (i * 7));
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1);
+    
+    // Obtenir toutes les semaines du mois sélectionné
+    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+    
+    // Parcourir chaque semaine du mois
+    for (let d = new Date(firstDayOfMonth); d <= lastDayOfMonth; d.setDate(d.getDate() + 7)) {
+      const weekStart = new Date(d);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay() + 1); // Lundi
       
       let weekPnL = 0;
+      let hasTradesThisWeek = false;
+      
       for (let j = 0; j < 7; j++) {
         const checkDate = new Date(weekStart);
         checkDate.setDate(checkDate.getDate() + j);
         const dateKey = checkDate.toISOString().split('T')[0];
-        if (tradingJournal[dateKey]?.hasTraded) {
-          weekPnL += parseFloat(tradingJournal[dateKey].pnl || 0);
+        
+        // Vérifier que la date est dans le mois sélectionné
+        if (checkDate >= firstDayOfMonth && checkDate <= lastDayOfMonth && monthJournal[dateKey]?.hasTraded) {
+          weekPnL += parseFloat(monthJournal[dateKey].pnl || 0);
+          hasTradesThisWeek = true;
         }
       }
-      if (weekPnL > 0) weeklyPnLs.push(weekPnL);
+      
+      if (hasTradesThisWeek && weekPnL > 0) {
+        weeklyPnLs.push(weekPnL);
+      }
     }
     
     if (weeklyPnLs.length > 0) {
       badges.push({
         id: 'first-profitable-week',
-        name: 'Première Semaine Verte',
+        name: 'Semaine(s) Profitable(s)',
         icon: Trophy,
         color: 'text-green-600',
         bgColor: 'bg-green-100',
-        description: 'Première semaine profitable'
+        description: `${weeklyPnLs.length} semaine${weeklyPnLs.length > 1 ? 's' : ''} profitable${weeklyPnLs.length > 1 ? 's' : ''} ce mois`
       });
     }
 
@@ -173,16 +342,26 @@ const Dashboard = ({
     }
 
     // Badge early bird (objectif atteint avant mi-mois)
-    const dayOfMonth = new Date().getDate();
-    if (monthlyTargetInfo.isAchieved && dayOfMonth <= 15) {
-      badges.push({
-        id: 'early-bird',
-        name: 'Early Bird',
-        icon: Calendar,
-        color: 'text-cyan-600',
-        bgColor: 'bg-cyan-100',
-        description: 'Objectif mensuel avant le 15'
-      });
+    // Ne montrer ce badge que pour le mois en cours ou si c'était vrai dans un mois passé
+    if (monthlyTargetInfo.isAchieved) {
+      // Pour un mois passé, vérifier si l'objectif a été atteint avant le 15
+      if (isViewingHistory) {
+        // Pour l'historique, on pourrait stocker cette info dans le snapshot
+        // Pour l'instant, on ne montre pas ce badge pour les mois passés
+      } else {
+        // Pour le mois en cours
+        const dayOfMonth = new Date().getDate();
+        if (dayOfMonth <= 15) {
+          badges.push({
+            id: 'early-bird',
+            name: 'Early Bird',
+            icon: Calendar,
+            color: 'text-cyan-600',
+            bgColor: 'bg-cyan-100',
+            description: 'Objectif mensuel avant le 15'
+          });
+        }
+      }
     }
 
     // Badge risk master
@@ -197,51 +376,59 @@ const Dashboard = ({
       });
     }
 
-    // Défis quotidiens
-    const today = new Date().toISOString().split('T')[0];
-    const todayData = tradingJournal?.[today];
-    const todayPnL = todayData?.hasTraded ? parseFloat(todayData.pnl || 0) : 0;
-    const dailyTarget = monthlyTargetInfo.targetAmount / 20;
+    // Défis quotidiens - uniquement pour aujourd'hui
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    let dailyChallenges = [];
     
-    // Vérifier si on a tradé aux bonnes heures
-    const hour = new Date().getHours();
-    const hasTradesOutsideHours = todayData?.hasTraded && (hour < 15.5 || hour >= 17.5);
-    
-    const dailyChallenges = [
-      {
-        id: 'risk-respect',
-        title: 'Respecter le risque de 1%',
-        description: 'Ne risquer que 1% max par trade aujourd\'hui',
-        completed: recommendations?.adjustedRiskPercent <= 1,
-        xp: 50
-      },
-      {
-        id: 'optimal-hours',
-        title: 'Trading aux bonnes heures',
-        description: 'Ne trader qu\'entre 15h30 et 17h30',
-        completed: !hasTradesOutsideHours,
-        xp: 30
-      },
-      {
-        id: 'profit-target',
-        title: 'Objectif journalier',
-        description: `Gagner au moins ${formatCurrency(dailyTarget)}`,
-        completed: todayPnL >= dailyTarget,
-        xp: 100
-      }
-    ];
+    // Afficher les défis uniquement si on regarde le mois actuel et aujourd'hui
+    if (isCurrentMonth) {
+      const todayData = tradingJournal?.[todayStr];
+      const todayPnL = todayData?.hasTraded ? parseFloat(todayData.pnl || 0) : 0;
+      const dailyTarget = monthlyTargetInfo.targetAmount / 20;
+      
+      // Vérifier si on a tradé aux bonnes heures
+      const hour = new Date().getHours();
+      const hasTradesOutsideHours = todayData?.hasTraded && (hour < 15.5 || hour >= 17.5);
+      
+      dailyChallenges = [
+        {
+          id: 'risk-respect',
+          title: 'Respecter le risque de 1%',
+          description: 'Ne risquer que 1% max par trade aujourd\'hui',
+          completed: recommendations?.adjustedRiskPercent <= 1,
+          xp: 50
+        },
+        {
+          id: 'optimal-hours',
+          title: 'Trading aux bonnes heures',
+          description: 'Ne trader qu\'entre 15h30 et 17h30',
+          completed: !hasTradesOutsideHours,
+          xp: 30
+        },
+        {
+          id: 'profit-target',
+          title: 'Objectif journalier',
+          description: `Gagner au moins ${formatCurrency(dailyTarget)}`,
+          completed: todayPnL >= dailyTarget,
+          xp: 100
+        }
+      ];
+    }
 
     return {
       level,
       levelInfo,
       totalXP,
+      monthXP,
       currentLevelXP,
       xpToNextLevel,
       badges,
       currentProfitStreak,
       winRate,
       totalTrades,
-      dailyChallenges
+      dailyChallenges,
+      isCurrentMonth
     };
   };
 
@@ -249,37 +436,139 @@ const Dashboard = ({
 
   return (
     <div className="space-y-6">
+      {/* Sélecteur de mois */}
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => navigateMonth(-1)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600" />
+            </button>
+            
+            <div className="text-center">
+              <h3 className="text-lg font-semibold text-slate-900">
+                {monthNames[selectedDate.getMonth()]} {selectedDate.getFullYear()}
+              </h3>
+              {isViewingHistory && (
+                <p className="text-sm text-slate-500">Vue historique</p>
+              )}
+            </div>
+            
+            <button
+              onClick={() => navigateMonth(1)}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              disabled={selectedDate >= new Date()}
+            >
+              <ChevronRight className="w-5 h-5 text-slate-600" />
+            </button>
+          </div>
+          
+          {isViewingHistory && (
+            <button
+              onClick={goToCurrentMonth}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span>Mois actuel</span>
+            </button>
+          )}
+        </div>
+        
+        {/* Afficher l'état du mois */}
+        {monthData && (
+          <div className="mt-4 p-3 bg-slate-50 rounded-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-600">Performance {isViewingHistory ? 'du mois' : 'en cours'}</p>
+                <p className={`text-xl font-bold ${monthData.monthlyPnLPercent >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {monthData.monthlyPnLPercent >= 0 ? '+' : ''}{monthData.monthlyPnLPercent.toFixed(2)}%
+                </p>
+                <p className="text-xs text-slate-500 mt-1">
+                  P&L: {monthData.monthlyPnL >= 0 ? '+' : ''}${monthData.monthlyPnL.toFixed(2)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-slate-600">Objectif {monthlyTarget}%</p>
+                <p className="flex items-center space-x-1">
+                  {monthlyTargetInfo.isAchieved ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 text-green-500" />
+                      <span className="text-sm font-medium text-green-600">Atteint</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 text-red-500" />
+                      <span className="text-sm font-medium text-red-600">Non atteint</span>
+                    </>
+                  )}
+                </p>
+                {monthData.isFromSnapshot && (
+                  <p className="text-xs text-slate-400 mt-1">Données archivées</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* NOUVELLE Section Gamification */}
       <div className="bg-gradient-to-br from-slate-900 to-slate-800 p-6 rounded-2xl shadow-xl text-white">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold flex items-center">
               <Trophy className="w-8 h-8 mr-3 text-yellow-400" />
-              Trading Performance & Achievements
+              Trading Performance & Achievements {isViewingHistory ? `- ${monthNames[selectedDate.getMonth()]}` : ''}
             </h2>
-            <p className="text-slate-300 mt-1">Suivez votre progression et débloquez des récompenses</p>
+            <p className="text-slate-300 mt-1">
+              {isViewingHistory ? 
+                `Performance du mois de ${monthNames[selectedDate.getMonth()].toLowerCase()}` : 
+                'Suivez votre progression et débloquez des récompenses'}
+            </p>
           </div>
           <div className="text-right">
-            <div className={`text-3xl font-bold bg-gradient-to-r ${gamificationData.levelInfo.color} bg-clip-text text-transparent`}>
-              Niveau {gamificationData.level}
-            </div>
-            <div className="text-sm text-slate-300">{gamificationData.levelInfo.title}</div>
+            {gamificationData.isCurrentMonth ? (
+              <>
+                <div className={`text-3xl font-bold bg-gradient-to-r ${gamificationData.levelInfo.color} bg-clip-text text-transparent`}>
+                  Niveau {gamificationData.level}
+                </div>
+                <div className="text-sm text-slate-300">{gamificationData.levelInfo.title}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-2xl font-bold text-yellow-400">
+                  {gamificationData.monthXP} XP
+                </div>
+                <div className="text-sm text-slate-300">XP du mois</div>
+              </>
+            )}
           </div>
         </div>
 
         {/* Barre de progression XP */}
-        <div className="mb-6">
-          <div className="flex justify-between text-sm text-slate-300 mb-2">
-            <span>{gamificationData.totalXP} XP Total</span>
-            <span>{gamificationData.xpToNextLevel} XP jusqu'au niveau {gamificationData.level + 1}</span>
+        {gamificationData.isCurrentMonth && (
+          <div className="mb-6">
+            <div className="flex justify-between text-sm text-slate-300 mb-2">
+              <span>{gamificationData.totalXP} XP Total</span>
+              <span>{gamificationData.xpToNextLevel} XP jusqu'au niveau {gamificationData.level + 1}</span>
+            </div>
+            <div className="w-full bg-slate-700 rounded-full h-3">
+              <div 
+                className={`h-3 rounded-full bg-gradient-to-r ${gamificationData.levelInfo.color} transition-all duration-1000`}
+                style={{ width: `${(gamificationData.currentLevelXP / 1000) * 100}%` }}
+              />
+            </div>
           </div>
-          <div className="w-full bg-slate-700 rounded-full h-3">
-            <div 
-              className={`h-3 rounded-full bg-gradient-to-r ${gamificationData.levelInfo.color} transition-all duration-1000`}
-              style={{ width: `${(gamificationData.currentLevelXP / 1000) * 100}%` }}
-            />
+        )}
+        
+        {/* XP du mois pour l'historique */}
+        {!gamificationData.isCurrentMonth && (
+          <div className="mb-6 text-center p-4 bg-slate-800/50 rounded-xl">
+            <div className="text-3xl font-bold text-yellow-400">{gamificationData.monthXP} XP</div>
+            <div className="text-sm text-slate-400">Gagnés en {monthNames[selectedDate.getMonth()].toLowerCase()}</div>
           </div>
-        </div>
+        )}
 
         {/* Stats rapides */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -296,7 +585,7 @@ const Dashboard = ({
               <Star className="w-5 h-5 text-yellow-400" />
               <span className="text-2xl font-bold">{gamificationData.winRate.toFixed(0)}%</span>
             </div>
-            <div className="text-xs text-slate-400">Win Rate</div>
+            <div className="text-xs text-slate-400">Win Rate {!gamificationData.isCurrentMonth ? 'du mois' : ''}</div>
           </div>
           
           <div className="bg-slate-800/50 rounded-xl p-4 border border-slate-700">
@@ -340,14 +629,15 @@ const Dashboard = ({
           </div>
         )}
 
-        {/* Défis quotidiens */}
-        <div>
-          <h3 className="text-lg font-semibold mb-3 flex items-center">
-            <Target className="w-5 h-5 mr-2 text-green-400" />
-            Défis du Jour
-          </h3>
-          <div className="grid md:grid-cols-3 gap-3">
-            {gamificationData.dailyChallenges.map((challenge) => (
+        {/* Défis quotidiens - uniquement pour le mois en cours */}
+        {gamificationData.isCurrentMonth && gamificationData.dailyChallenges.length > 0 && (
+          <div>
+            <h3 className="text-lg font-semibold mb-3 flex items-center">
+              <Target className="w-5 h-5 mr-2 text-green-400" />
+              Défis du Jour
+            </h3>
+            <div className="grid md:grid-cols-3 gap-3">
+              {gamificationData.dailyChallenges.map((challenge) => (
               <div 
                 key={challenge.id} 
                 className={`bg-slate-800/50 rounded-xl p-4 border ${
@@ -375,6 +665,7 @@ const Dashboard = ({
             ))}
           </div>
         </div>
+      )}
       </div>
 
       {/* NOUVELLE Alerte de Protection Drawdown */}
@@ -440,8 +731,8 @@ const Dashboard = ({
             <div className="w-12 h-12 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
               <DollarSign className="w-6 h-6 text-white" />
             </div>
-            <span className={`text-sm font-medium ${recommendations && recommendations.totalPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {recommendations ? `${recommendations.totalPnLPercent >= 0 ? '+' : ''}${recommendations.totalPnLPercent.toFixed(2)}%` : '---'}
+            <span className={`text-sm font-medium ${monthData.monthlyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {monthData.monthlyPnLPercent >= 0 ? '+' : ''}${monthData.monthlyPnLPercent.toFixed(2)}%
             </span>
           </div>
           <h3 className="text-2xl font-bold text-slate-900">
@@ -567,7 +858,7 @@ const Dashboard = ({
             
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-slate-700">Actuel</span>
-              <span className="text-lg font-bold text-slate-900">{formatCurrency(actualBalance)}</span>
+              <span className="text-lg font-bold text-slate-900">{formatCurrency(monthData.actualBalance)}</span>
             </div>
 
             {!monthlyTargetInfo.isAchieved ? (
@@ -578,7 +869,7 @@ const Dashboard = ({
             ) : (
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium text-slate-700">Dépassement</span>
-                <span className="text-xl font-bold text-green-600">+{formatCurrency(actualBalance - monthlyTargetInfo.targetAmount)}</span>
+                <span className="text-xl font-bold text-green-600">+{formatCurrency(monthData.actualBalance - monthlyTargetInfo.targetAmount)}</span>
               </div>
             )}
 
@@ -685,9 +976,9 @@ const Dashboard = ({
             </div>
             <div className="text-right">
               <div className="text-2xl font-bold">
-                {recommendations.totalPnL >= 0 ? '+' : ''}${recommendations.totalPnL.toFixed(2)}
+                {monthData.monthlyPnL >= 0 ? '+' : ''}${Math.abs(monthData.monthlyPnL).toFixed(2)}
               </div>
-              <div className="opacity-90">P&L Total</div>
+              <div className="opacity-90">P&L {isViewingHistory ? 'du mois' : 'ce mois'}</div>
             </div>
           </div>
           

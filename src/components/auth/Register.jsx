@@ -107,7 +107,7 @@ const Register = ({ onToggleMode }) => {
         {/* Logo/Titre */}
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">
-            Smart Risk Management
+          Méthode Alpha AI System 
           </h1>
           <p className="text-blue-200">
             Créez votre compte pour commencer

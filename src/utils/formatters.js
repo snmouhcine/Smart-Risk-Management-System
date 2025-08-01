@@ -83,16 +83,16 @@ export const parseNumberInput = (input, decimals = 2) => {
 /**
  * Calcule le montant restant pour atteindre un objectif mensuel
  * @param {number} currentBalance - Solde actuel
- * @param {number} initialCapital - Capital initial
+ * @param {number} monthStartCapital - Capital de début de mois (ou initial si pas défini)
  * @param {number} targetPercent - Objectif en pourcentage
  * @returns {object} - Informations sur l'objectif mensuel
  */
-export const calculateMonthlyTargetAmount = (currentBalance, initialCapital, targetPercent) => {
+export const calculateMonthlyTargetAmount = (currentBalance, monthStartCapital, targetPercent) => {
   const currentBalanceNum = parseFloat(currentBalance) || 0;
-  const initialCapitalNum = parseFloat(initialCapital) || 0;
+  const monthStartCapitalNum = parseFloat(monthStartCapital) || 0;
   const targetPercentNum = parseFloat(targetPercent) || 0;
   
-  if (initialCapitalNum <= 0) {
+  if (monthStartCapitalNum <= 0) {
     return {
       targetAmount: 0,
       remainingAmount: 0,
@@ -102,9 +102,9 @@ export const calculateMonthlyTargetAmount = (currentBalance, initialCapital, tar
     };
   }
   
-  const targetAmount = initialCapitalNum * (1 + targetPercentNum / 100);
+  const targetAmount = monthStartCapitalNum * (1 + targetPercentNum / 100);
   const remainingAmount = Math.max(0, targetAmount - currentBalanceNum);
-  const currentReturn = ((currentBalanceNum - initialCapitalNum) / initialCapitalNum) * 100;
+  const currentReturn = ((currentBalanceNum - monthStartCapitalNum) / monthStartCapitalNum) * 100;
   const currentProgress = Math.min(100, (currentReturn / targetPercentNum) * 100);
   const isAchieved = currentBalanceNum >= targetAmount;
   

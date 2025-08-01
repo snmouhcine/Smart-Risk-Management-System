@@ -644,4 +644,156 @@ export class DataService {
       }
     })
   }
+
+  // === MONTHLY SNAPSHOTS ===
+  
+  // Create or update monthly snapshot
+  static async createMonthlySnapshot(userId, snapshotData) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_snapshots')
+        .upsert({
+          user_id: userId,
+          ...snapshotData,
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      return data
+    } catch (error) {
+      throw error
+    }
+  }
+
+  // Get all monthly snapshots for a user
+  static async getMonthlySnapshots(userId) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_snapshots')
+        .select('*')
+        .eq('user_id', userId)
+        .order('year', { ascending: false })
+        .order('month', { ascending: false })
+      
+      if (error) throw error
+      return data || []
+    } catch (error) {
+      console.warn('Monthly snapshots table not found:', error)
+      return []
+    }
+  }
+
+  // Get specific month snapshot
+  static async getMonthlySnapshot(userId, year, month) {
+    try {
+      const { data, error } = await supabase
+        .from('monthly_snapshots')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('year', year)
+        .eq('month', month)
+        .single()
+      
+      if (error && error.code !== 'PGRST116') throw error // PGRST116 = not found
+      return data
+    } catch (error) {
+      console.warn('Monthly snapshot not found:', error)
+      return null
+    }
+  }
+
+  // Check and perform monthly reset
+  static async checkAndPerformMonthlyReset(userId) {
+    try {
+      const { data, error } = await supabase
+        .rpc('check_monthly_reset', { p_user_id: userId })
+      
+      if (error) throw error
+      return data // returns true if reset was performed
+    } catch (error) {
+      console.warn('Monthly reset function not found:', error)
+      return false
+    }
+  }
+
+  // Save end of month snapshot
+  static async saveEndOfMonthSnapshot(userId, year, month) {
+    try {
+      // Get current user settings
+      const settings = await this.getUserSettings(userId)
+      
+      // Get all journal entries for the month
+      const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0]
+      
+      const { data: monthJournal, error: journalError } = await supabase
+        .from('trading_journal')
+        .select('*')
+        .eq('user_id', userId)
+        .gte('trade_date', startDate)
+        .lte('trade_date', endDate)
+        .order('trade_date')
+      
+      if (journalError) throw journalError
+
+      // Calculate month metrics
+      const monthEntries = monthJournal || []
+      const tradingDays = monthEntries.filter(d => d.has_traded)
+      const totalTrades = tradingDays.length
+      const totalPnL = tradingDays.reduce((sum, d) => sum + (parseFloat(d.pnl) || 0), 0)
+      const winningTrades = tradingDays.filter(d => parseFloat(d.pnl) > 0).length
+      const losingTrades = tradingDays.filter(d => parseFloat(d.pnl) < 0).length
+      const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0
+
+      // Calculate month start capital (from previous month end or initial capital)
+      const prevMonth = month === 1 ? 12 : month - 1
+      const prevYear = month === 1 ? year - 1 : year
+      const prevSnapshot = await this.getMonthlySnapshot(userId, prevYear, prevMonth)
+      const monthStartCapital = prevSnapshot ? prevSnapshot.month_end_capital : settings.initial_capital
+      
+      const monthEndCapital = monthStartCapital + totalPnL
+      const pnlPercentage = monthStartCapital > 0 ? (totalPnL / monthStartCapital) * 100 : 0
+      const targetAchieved = pnlPercentage >= settings.monthly_target
+
+      // Calculate additional metrics
+      const bestTrade = Math.max(...tradingDays.map(d => parseFloat(d.pnl) || 0), 0)
+      const worstTrade = Math.min(...tradingDays.map(d => parseFloat(d.pnl) || 0), 0)
+      const wins = tradingDays.filter(d => parseFloat(d.pnl) > 0)
+      const losses = tradingDays.filter(d => parseFloat(d.pnl) < 0)
+      const avgWin = wins.length > 0 ? wins.reduce((sum, d) => sum + parseFloat(d.pnl), 0) / wins.length : 0
+      const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((sum, d) => sum + parseFloat(d.pnl), 0) / losses.length) : 0
+      const profitFactor = avgLoss > 0 ? avgWin / avgLoss : 0
+
+      // Create snapshot
+      const snapshotData = {
+        snapshot_date: endDate,
+        month: month,
+        year: year,
+        month_start_capital: monthStartCapital,
+        month_end_capital: monthEndCapital,
+        total_pnl: totalPnL,
+        pnl_percentage: pnlPercentage,
+        monthly_target: settings.monthly_target,
+        target_achieved: targetAchieved,
+        total_trades: totalTrades,
+        winning_trades: winningTrades,
+        losing_trades: losingTrades,
+        win_rate: winRate,
+        max_drawdown: 0, // Could be calculated if needed
+        avg_risk_per_trade: settings.risk_per_trade,
+        best_trade: bestTrade,
+        worst_trade: worstTrade,
+        avg_win: avgWin,
+        avg_loss: avgLoss,
+        profit_factor: profitFactor,
+        journal_entries: monthEntries
+      }
+
+      return await this.createMonthlySnapshot(userId, snapshotData)
+    } catch (error) {
+      throw error
+    }
+  }
 }

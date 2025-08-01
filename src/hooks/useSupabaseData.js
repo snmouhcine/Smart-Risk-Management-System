@@ -17,6 +17,8 @@ export const useSupabaseData = () => {
   const [checklistSessions, setChecklistSessions] = useState([])
   const [activeTrade, setActiveTrade] = useState(null)
   const [completedTrades, setCompletedTrades] = useState([])
+  const [monthlySnapshots, setMonthlySnapshots] = useState([])
+  const [currentMonthSnapshot, setCurrentMonthSnapshot] = useState(null)
 
   // Charger les données utilisateur
   const loadUserData = async () => {
@@ -55,6 +57,31 @@ export const useSupabaseData = () => {
       // Charger les trades complétés
       const completed = await DataService.getCompletedTrades(user.id)
       setCompletedTrades(completed)
+      
+      // Charger les snapshots mensuels
+      const snapshots = await DataService.getMonthlySnapshots(user.id)
+      setMonthlySnapshots(snapshots)
+      
+      // Vérifier et effectuer le reset mensuel si nécessaire
+      const wasReset = await DataService.checkAndPerformMonthlyReset(user.id)
+      
+      // Si un reset a été effectué, sauvegarder automatiquement le snapshot du mois précédent
+      if (wasReset) {
+        const now = new Date()
+        const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1
+        const prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear()
+        
+        // Vérifier si le snapshot existe déjà
+        const existingSnapshot = await DataService.getMonthlySnapshot(user.id, prevYear, prevMonth + 1)
+        if (!existingSnapshot) {
+          await DataService.saveEndOfMonthSnapshot(user.id, prevYear, prevMonth + 1)
+        }
+      }
+      
+      // Charger le snapshot du mois en cours
+      const now = new Date()
+      const currentSnapshot = await DataService.getMonthlySnapshot(user.id, now.getFullYear(), now.getMonth() + 1)
+      setCurrentMonthSnapshot(currentSnapshot)
       
     } catch (err) {
       setError(err.message)
@@ -357,9 +384,40 @@ export const useSupabaseData = () => {
       setChecklistSessions([])
       setActiveTrade(null)
       setCompletedTrades([])
+      setMonthlySnapshots([])
+      setCurrentMonthSnapshot(null)
       setLoading(false)
     }
   }, [isAuthenticated, user?.id])
+
+  // === MÉTHODES SNAPSHOTS MENSUELS ===
+  
+  // Sauvegarder un snapshot de fin de mois
+  const saveMonthlySnapshot = async (year, month) => {
+    if (!user?.id) return
+    
+    try {
+      const snapshot = await DataService.saveEndOfMonthSnapshot(user.id, year, month)
+      setMonthlySnapshots(prev => [...prev.filter(s => !(s.year === year && s.month === month)), snapshot])
+      return { success: true, data: snapshot }
+    } catch (err) {
+      setError(err.message)
+      return { success: false, error: err.message }
+    }
+  }
+  
+  // Récupérer un snapshot spécifique
+  const getMonthSnapshot = async (year, month) => {
+    if (!user?.id) return null
+    
+    try {
+      const snapshot = await DataService.getMonthlySnapshot(user.id, year, month)
+      return snapshot
+    } catch (err) {
+      setError(err.message)
+      return null
+    }
+  }
 
   return {
     // États
@@ -372,6 +430,8 @@ export const useSupabaseData = () => {
     checklistSessions,
     activeTrade,
     completedTrades,
+    monthlySnapshots,
+    currentMonthSnapshot,
     
     // Méthodes générales
     refreshData: loadUserData,
@@ -395,6 +455,10 @@ export const useSupabaseData = () => {
     createActiveTrade,
     closeActiveTrade,
     deleteCompletedTrade,
-    deleteAllCompletedTrades
+    deleteAllCompletedTrades,
+    
+    // Méthodes snapshots mensuels
+    saveMonthlySnapshot,
+    getMonthSnapshot
   }
 }

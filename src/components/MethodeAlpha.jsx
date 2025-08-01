@@ -49,7 +49,10 @@ const MethodeAlpha = () => {
     closeActiveTrade,
     completedTrades,
     deleteCompletedTrade,
-    deleteAllCompletedTrades
+    deleteAllCompletedTrades,
+    // Monthly snapshots
+    monthlySnapshots,
+    currentMonthSnapshot
   } = useSupabaseData();
 
   // États locaux pour l'interface
@@ -882,7 +885,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       return sum;
     }, 0);
     
-    const monthlyPnLPercent = (monthlyPnL / initialCapitalNum) * 100;
+    // Utiliser le capital de début de mois pour les calculs mensuels
+    const monthStartCapital = userSettings?.month_start_capital || initialCapitalNum;
+    const monthlyPnLPercent = (monthlyPnL / monthStartCapital) * 100;
 
     // Intégration du système de protection drawdown
     const drawdownProtection = calculateDrawdownProtection();
@@ -1254,6 +1259,9 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               isAnalyzing={isAnalyzing}
               secureMode={secureMode}
               getStatusStyles={getStatusStyles}
+              monthlySnapshots={monthlySnapshots}
+              currentMonthSnapshot={currentMonthSnapshot}
+              userSettings={userSettings}
             />
           )}
 
