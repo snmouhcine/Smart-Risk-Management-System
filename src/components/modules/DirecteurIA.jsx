@@ -18,6 +18,7 @@ const DirecteurIA = ({
   recommendations,
   stats,
   capital,
+  monthStartCapital,
   journalData,
   monthlyObjective,
   weeklyObjective,
@@ -28,33 +29,45 @@ const DirecteurIA = ({
 
   // Utiliser les vraies données de la plateforme
   const realCapital = capital || 50000;
+  const realMonthStartCapital = monthStartCapital || realCapital;
   const realStats = stats || {
     winRate: 0,
     profitFactor: 1,
     totalTrades: 0,
     consecutiveLosses: 0,
     consecutiveWins: 0,
-    totalPnL: 0
+    totalPnL: 0,
+    monthlyPnL: 0,
+    monthlyWinRate: 0,
+    monthlyTrades: 0
   };
 
   // Calcul du niveau de danger basé sur les vraies données
   const calculateDangerLevel = () => {
     let danger = 20; // Base
 
-    // Drawdown actuel
-    const currentDrawdown = realCapital > 0 ? ((realCapital - (realCapital + realStats.totalPnL)) / realCapital) * 100 : 0;
-    if (currentDrawdown > 10) danger += 40;
-    else if (currentDrawdown > 5) danger += 25;
-    else if (currentDrawdown > 3) danger += 15;
+    // Drawdown mensuel (basé sur le mois en cours)
+    const monthlyDrawdown = realMonthStartCapital > 0 ? 
+      Math.max(0, ((realMonthStartCapital - realCapital) / realMonthStartCapital) * 100) : 0;
+    
+    if (monthlyDrawdown > 10) danger += 40;
+    else if (monthlyDrawdown > 5) danger += 25;
+    else if (monthlyDrawdown > 3) danger += 15;
 
-    // Pertes consécutives
-    if (realStats.consecutiveLosses >= 3) danger += 30;
-    else if (realStats.consecutiveLosses >= 2) danger += 20;
-    else if (realStats.consecutiveLosses >= 1) danger += 10;
+    // Pertes consécutives (uniquement si on a des trades ce mois-ci)
+    if (realStats.monthlyTrades > 0) {
+      const monthlyConsecutiveLosses = realStats.monthlyConsecutiveLosses || 0;
+      if (monthlyConsecutiveLosses >= 3) danger += 30;
+      else if (monthlyConsecutiveLosses >= 2) danger += 20;
+      else if (monthlyConsecutiveLosses >= 1) danger += 10;
+    }
 
-    // Win rate faible
-    if (realStats.winRate < 30) danger += 20;
-    else if (realStats.winRate < 40) danger += 10;
+    // Win rate mensuel faible (uniquement si on a des trades ce mois-ci)
+    if (realStats.monthlyTrades > 0) {
+      const monthlyWinRate = realStats.monthlyWinRate || 0;
+      if (monthlyWinRate < 30) danger += 20;
+      else if (monthlyWinRate < 40) danger += 10;
+    }
 
     // Overtrading
     const today = new Date();
@@ -74,12 +87,13 @@ const DirecteurIA = ({
     let opportunity = 0; // Base à 0
     
     // 1. Conditions psychologiques (40 points max)
-    // État mental basé sur les pertes consécutives
-    if (realStats.consecutiveLosses === 0) {
+    // État mental basé sur les pertes consécutives du mois
+    const monthlyConsecutiveLosses = realStats.monthlyConsecutiveLosses || 0;
+    if (monthlyConsecutiveLosses === 0) {
       opportunity += 20; // Excellent état mental
-    } else if (realStats.consecutiveLosses === 1) {
+    } else if (monthlyConsecutiveLosses === 1) {
       opportunity += 10; // État mental correct
-    } else if (realStats.consecutiveLosses >= 3) {
+    } else if (monthlyConsecutiveLosses >= 3) {
       opportunity -= 10; // État mental dégradé
     }
     
@@ -130,13 +144,14 @@ const DirecteurIA = ({
       opportunity += 10; // Objectif hebdo atteint - Prudence
     }
     
-    // Niveau de drawdown
-    const currentDrawdown = realCapital > 0 ? ((realCapital - (realCapital + realStats.totalPnL)) / realCapital) * 100 : 0;
-    if (currentDrawdown <= 2) {
+    // Niveau de drawdown mensuel
+    const monthlyDrawdown = realMonthStartCapital > 0 ? 
+      Math.max(0, ((realMonthStartCapital - realCapital) / realMonthStartCapital) * 100) : 0;
+    if (monthlyDrawdown <= 2) {
       opportunity += 15; // Capital bien protégé
-    } else if (currentDrawdown <= 5) {
+    } else if (monthlyDrawdown <= 5) {
       opportunity += 5; // Capital sous contrôle
-    } else if (currentDrawdown > 8) {
+    } else if (monthlyDrawdown > 8) {
       opportunity -= 20; // Drawdown critique
     }
     
@@ -156,11 +171,12 @@ const DirecteurIA = ({
       patience: 100
     };
 
-    // Revenge trading
-    if (realStats.consecutiveLosses >= 3) {
+    // Revenge trading (basé sur les pertes consécutives du mois)
+    const monthlyConsecutiveLosses = realStats.monthlyConsecutiveLosses || 0;
+    if (monthlyConsecutiveLosses >= 3) {
       patterns.revenge = 80;
       patterns.discipline -= 40;
-    } else if (realStats.consecutiveLosses >= 2) {
+    } else if (monthlyConsecutiveLosses >= 2) {
       patterns.revenge = 50;
       patterns.discipline -= 20;
     }

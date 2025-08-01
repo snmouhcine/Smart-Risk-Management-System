@@ -289,11 +289,14 @@ const MethodeAlpha = () => {
     
     if (!currentBalanceNum || !initialCapitalNum) return null;
 
+    // Utiliser le capital de début de mois pour les calculs mensuels
+    const monthStartCapital = userSettings?.month_start_capital || initialCapitalNum;
+
     // Calcul du pic mensuel (plus haut capital ce mois-ci)
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     
-    let monthlyPeakValue = initialCapitalNum;
+    let monthlyPeakValue = monthStartCapital;
     let peakDate = null;
     
     // Calculer le capital jour par jour ce mois-ci
@@ -304,7 +307,7 @@ const MethodeAlpha = () => {
       })
       .sort(([a], [b]) => new Date(a) - new Date(b));
     
-    let runningBalance = initialCapitalNum;
+    let runningBalance = monthStartCapital;
     
     // Recalculer le capital à chaque jour pour trouver le pic
     const dailyBalances = [];
@@ -432,8 +435,11 @@ const MethodeAlpha = () => {
       const today = new Date();
       const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
       const businessDaysLeft = getBusinessDaysLeft(today);
-      const currentMonthlyReturn = ((currentBalanceNum - initialCapitalNum) / initialCapitalNum) * 100;
-      const requiredGainToTarget = ((monthlyTarget - currentMonthlyReturn) / 100) * initialCapitalNum;
+      
+      // Utiliser le capital de début de mois pour les calculs mensuels
+      const monthStartCapital = userSettings?.month_start_capital || initialCapitalNum;
+      const currentMonthlyReturn = ((currentBalanceNum - monthStartCapital) / monthStartCapital) * 100;
+      const requiredGainToTarget = ((monthlyTarget - currentMonthlyReturn) / 100) * monthStartCapital;
       
       // Vérifier si l'objectif mensuel est atteint
       const monthlyObjectiveAchieved = currentMonthlyReturn >= monthlyTarget;
@@ -462,6 +468,7 @@ const MethodeAlpha = () => {
       const financialData = {
         // Capital et Performance
         initialCapital: initialCapitalNum,
+        monthStartCapital: monthStartCapital,
         currentCapital: currentBalanceNum,
         totalReturn: currentMonthlyReturn,
         targetReturn: monthlyTarget,
@@ -542,10 +549,13 @@ DONNÉES FINANCIÈRES RÉELLES (Date: ${today.toISOString().split('T')[0]}):
 ${JSON.stringify(financialData, null, 2)}
 
 VALIDATION DES DONNÉES:
+- Mois en cours: ${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+- Capital début de mois: $${monthStartCapital.toFixed(2)}
 - Capital actuel: $${currentBalanceNum.toFixed(2)}
-- P&L Total: $${stats.totalPnL.toFixed(2)}
-- Nombre de trades: ${stats.totalTrades}
-- Win Rate réel: ${stats.winRate.toFixed(1)}%
+- P&L du mois: $${(currentBalanceNum - monthStartCapital).toFixed(2)}
+- Performance mensuelle: ${currentMonthlyReturn.toFixed(2)}%
+- Nombre de trades ce mois: ${smartRec?.monthlyTrades || 0}
+- Win Rate du mois: ${smartRec?.monthlyWinRate?.toFixed(1) || 0}%
 - Jours ouvrables restants ce mois: ${businessDaysLeft}
 
 CONTEXTE CRITIQUE:
@@ -645,8 +655,11 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       const today = new Date();
       const daysLeftInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate() - today.getDate();
       const businessDaysLeft = getBusinessDaysLeft(today);
-      const currentReturn = ((currentBalanceNum - parseFloat(initialCapital)) / parseFloat(initialCapital)) * 100;
-      const requiredGain = ((monthlyTarget - currentReturn) / 100) * parseFloat(initialCapital);
+      
+      // Utiliser le capital de début de mois pour les calculs mensuels
+      const monthStartCapital = userSettings?.month_start_capital || parseFloat(initialCapital);
+      const currentReturn = ((currentBalanceNum - monthStartCapital) / monthStartCapital) * 100;
+      const requiredGain = ((monthlyTarget - currentReturn) / 100) * monthStartCapital;
       const drawdown = calculateDrawdownProtection();
       const stats = getJournalStats();
       
@@ -832,6 +845,24 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     const consecutiveLosses = recentTrades.reverse().findIndex(day => parseFloat(day.pnl) >= 0);
     const actualConsecutiveLosses = consecutiveLosses === -1 ? recentTrades.length : consecutiveLosses;
     
+    // Calcul des stats mensuelles
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEntries = Object.entries(tradingJournal).filter(([dateKey, day]) => {
+      const tradeDate = new Date(dateKey);
+      return tradeDate >= firstDayOfMonth && day.hasTraded;
+    }).map(([_, day]) => day);
+    
+    const monthProfits = monthEntries.filter(day => parseFloat(day.pnl) > 0);
+    const monthLosses = monthEntries.filter(day => parseFloat(day.pnl) < 0);
+    const monthlyPnL = monthEntries.reduce((sum, day) => sum + (parseFloat(day.pnl) || 0), 0);
+    const monthlyWinRate = monthEntries.length > 0 ? (monthProfits.length / monthEntries.length * 100) : 0;
+    
+    // Calcul des pertes consécutives du mois en cours uniquement
+    const monthRecentTrades = monthEntries.slice(-5);
+    const monthConsecutiveLosses = monthRecentTrades.reverse().findIndex(day => parseFloat(day.pnl) >= 0);
+    const actualMonthConsecutiveLosses = monthConsecutiveLosses === -1 ? monthRecentTrades.length : monthConsecutiveLosses;
+    
     return {
       totalTrades: entries.length,
       winningTrades: profits.length,
@@ -841,7 +872,14 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
       avgWin,
       avgLoss,
       consecutiveLosses: actualConsecutiveLosses,
-      profitFactor: avgLoss > 0 ? (avgWin * profits.length) / (avgLoss * losses.length) : 0
+      profitFactor: avgLoss > 0 ? (avgWin * profits.length) / (avgLoss * losses.length) : 0,
+      // Stats mensuelles
+      monthlyTrades: monthEntries.length,
+      monthlyWinningTrades: monthProfits.length,
+      monthlyLosingTrades: monthLosses.length,
+      monthlyPnL,
+      monthlyWinRate,
+      monthlyConsecutiveLosses: actualMonthConsecutiveLosses
     };
   };
 
@@ -876,14 +914,20 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     const weeklyPnLPercent = (weeklyPnL / initialCapitalNum) * 100;
     
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    let monthlyTrades = 0;
+    let monthlyWins = 0;
     const monthlyPnL = Object.entries(tradingJournal).reduce((sum, [dateKey, dayData]) => {
       if (!dayData.hasTraded || !dayData.pnl) return sum;
       const tradeDate = new Date(dateKey);
       if (tradeDate >= firstDayOfMonth) {
+        monthlyTrades++;
+        if (parseFloat(dayData.pnl) > 0) monthlyWins++;
         return sum + parseFloat(dayData.pnl);
       }
       return sum;
     }, 0);
+    
+    const monthlyWinRate = monthlyTrades > 0 ? (monthlyWins / monthlyTrades) * 100 : 0;
     
     // Utiliser le capital de début de mois pour les calculs mensuels
     const monthStartCapital = userSettings?.month_start_capital || initialCapitalNum;
@@ -974,6 +1018,7 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
     return {
       totalPnL, totalPnLPercent, weeklyPnL, weeklyPnLPercent,
       monthlyPnL, monthlyPnLPercent, weeklyTarget, monthlyTarget,
+      monthlyTrades, monthlyWinRate,
       status, riskAdjustment, message, suggestions, nextTradeAdvice,
       adjustedRiskPercent: finalRisk,
       maxRiskAmount: riskAmount,
@@ -1347,7 +1392,8 @@ IMPORTANT: Réponse UNIQUEMENT en JSON valide, analyse comme un vrai directeur f
               openaiApiKey={openaiApiKey}
               recommendations={recommendations}
               stats={getJournalStats()}
-              capital={parseFloat(capital) || parseFloat(currentBalance) || 0}
+              capital={calculateCurrentBalanceFromJournal() || parseFloat(currentBalance) || parseFloat(capital) || 0}
+              monthStartCapital={userSettings?.month_start_capital || parseFloat(initialCapital) || 0}
               journalData={tradingJournal}
               monthlyObjective={{ 
                 current: recommendations?.monthlyPnLPercent || 0, 
